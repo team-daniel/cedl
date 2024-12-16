@@ -1,6 +1,7 @@
 from datasets import DatasetManager
-import models
+from utils import Datasets, Thresholds, Attacks
 import metrics
+import models
 
 import foolbox
 import matplotlib.pyplot as plt
@@ -8,7 +9,7 @@ import tensorflow as tf
 import numpy as np
 
 class ModelEvaluater:
-    def __init__(self, model, id_dataset_name, ood_dataset_name, threshold="diff_entropy"):
+    def __init__(self, model, id_dataset_name: Datasets, ood_dataset_name: Datasets, threshold: Thresholds):
         self.dataset_manager = DatasetManager()
         self.id_dataset_name = id_dataset_name
         self.ood_dataset_name = ood_dataset_name
@@ -32,10 +33,10 @@ class ModelEvaluater:
 
     # get the ID-OOD threshold
     def get_threshold(self):
-        if self.threshold == "diff_entropy" and not isinstance(self.model, (models.EvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel)):
+        if self.threshold == Thresholds.DIFF_ENTROPY and not isinstance(self.model, (models.EvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel)):
                 raise RuntimeError("Differential Entropy threshold is only allowed for Evidential-based models.")
         
-        if self.threshold == "pred_entropy":
+        if self.threshold == Thresholds.PRED_ENTROPY:
             if isinstance(self.model, (models.EvidentialPlusModel, models.ConflictingEvidentialModel)): 
                 alpha_id = self.model.predict_probs(self.id_x_test, for_threshold=True)
                 alpha_ood = self.model.predict_probs(self.ood_x_test, for_threshold=True)
@@ -55,7 +56,7 @@ class ModelEvaluater:
 
     # evaluate the Id and OOD data
     def evaluate_data(self):
-        if self.threshold == "pred_entropy":
+        if self.threshold == Thresholds.PRED_ENTROPY:
             id_predictions = self.model.predict_probs(self.id_x_test)
             ood_predictions = self.model.predict_probs(self.ood_x_test)
         else:
@@ -63,7 +64,7 @@ class ModelEvaluater:
             ood_predictions = self.model.predict(self.ood_x_test, verbose=0)
         
         self.optimal_threshold = self.get_threshold()
-        if self.threshold == "pred_entropy":
+        if self.threshold == Thresholds.PRED_ENTROPY:
             self.optimal_threshold = -self.optimal_threshold
         print(f"Optimal Threshold: {self.optimal_threshold:.4f}") 
           
@@ -83,9 +84,9 @@ class ModelEvaluater:
         else:
             raise ValueError("dataset_type must be either 'ID' or 'OOD'.")
 
-        if attack == "l2pgd":
+        if attack == Attacks.L2PGD:
             attack = foolbox.attacks.L2PGD()
-        elif attack == "linfpgd":
+        elif attack == Attacks.LinfPGD:
             attack = foolbox.attacks.LinfPGD()
         else:
             raise ValueError("Unsupported attack.")
@@ -93,7 +94,7 @@ class ModelEvaluater:
         criterion = foolbox.criteria.Misclassification(labels)
         _, adversarial_images, _ = attack(self.fmodel, images, criterion, epsilons=epsilons)
 
-        if self.threshold == "pred_entropy":
+        if self.threshold == Thresholds.PRED_ENTROPY:
             adv_predictions = self.model.predict_probs(adversarial_images)
         else:
             adv_predictions = self.model.predict(adversarial_images, verbose=0)
@@ -109,10 +110,10 @@ class ModelEvaluater:
 
     # get results based off predicitons
     def get_results(self, predictions, true_labels, dataset_type):
-        if self.threshold == "diff_entropy":
+        if self.threshold == Thresholds.DIFF_ENTROPY:
             scores = metrics.diff_entropy(predictions)
             decision = scores >= self.optimal_threshold
-        elif self.threshold == "pred_entropy":
+        elif self.threshold == Thresholds.PRED_ENTROPY:
             scores = -metrics.pred_entropy(predictions)
             decision = scores <= self.optimal_threshold 
 

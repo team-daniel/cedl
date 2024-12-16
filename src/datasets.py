@@ -1,11 +1,12 @@
 import tensorflow as tf
 import numpy as np
+from utils import Datasets
 
 class DatasetManager:
     def __init__(self):
         self.datasets = {
-            "MNIST": self._load_mnist_data(),
-            "FashionMNIST": self._load_fashion_data()
+            Datasets.MNIST.value: self._load_mnist_data(),
+            Datasets.FashionMNIST.value: self._load_fashion_data(),
         }
 
     @staticmethod
@@ -26,11 +27,11 @@ class DatasetManager:
         y_test = tf.keras.utils.to_categorical(y_test, 10)
         return x_train, y_train, x_test, y_test
 
-    def get_dataset(self, name):
-        return self.datasets.get(name, None)
+    def get_dataset(self, name: Datasets):
+        return self.datasets.get(name.value)
 
-    def print_shape(self, name):
-        dataset = self.get_dataset(name)
+    def print_shape(self, name: Datasets):
+        dataset = self.datasets.get(name.value)
         if dataset is not None:
             x_train, y_train, x_test, y_test = dataset
             print(f"Dataset: {name}")

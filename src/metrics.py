@@ -1,14 +1,16 @@
+from utils import Thresholds
+
 import numpy as np
 import scipy
 import sklearn
 
-def get_optimal_threshold(alpha_id, alpha_ood, metric="diff_entropy"):
-    if metric == "diff_entropy":
+def get_optimal_threshold(alpha_id, alpha_ood, metric: Thresholds = Thresholds.DIFF_ENTROPY):
+    if metric == Thresholds.DIFF_ENTROPY:
         id_scores = diff_entropy(alpha_id)
         ood_scores = diff_entropy(alpha_ood)
-    elif metric == "pred_entropy":
+    elif metric == Thresholds.PRED_ENTROPY:
         id_scores = pred_entropy(alpha_id)
-        ood_scores = pred_entropy(alpha_ood)     
+        ood_scores = pred_entropy(alpha_ood)    
 
     corrects = np.concatenate([np.ones(len(alpha_id)), np.zeros(len(alpha_ood))], axis=0)
     scores = np.concatenate([id_scores, ood_scores], axis=0)
