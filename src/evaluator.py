@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
 
-class ModelEvaluater:
+class ModelEvaluator:
     def __init__(self, model, id_dataset_name: Datasets, ood_dataset_name: Datasets, threshold: Thresholds):
         self.dataset_manager = DatasetManager()
         self.id_dataset_name = id_dataset_name
