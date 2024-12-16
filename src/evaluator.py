@@ -32,14 +32,18 @@ class ModelEvaluater:
 
     # get the ID-OOD threshold
     def get_threshold(self):
-        if self.threshold == "diff_entropy" and not isinstance(self.model, (models.EvidentialModel, models.EvidentialPlusModel)):
+        if self.threshold == "diff_entropy" and not isinstance(self.model, (models.EvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel)):
                 raise RuntimeError("Differential Entropy threshold is only allowed for Evidential-based models.")
         
         if self.threshold == "pred_entropy":
-            alpha_id = self.model(self.id_x_test)
-            alpha_ood = self.model(self.ood_x_test)
+            if isinstance(self.model, (models.EvidentialPlusModel, models.ConflictingEvidentialModel)): 
+                alpha_id = self.model.predict_probs(self.id_x_test, for_threshold=True)
+                alpha_ood = self.model.predict_probs(self.ood_x_test, for_threshold=True)
+            else:
+                alpha_id = self.model.predict_probs(self.id_x_test)
+                alpha_ood = self.model.predict_probs(self.ood_x_test)
         else:
-            if isinstance(self.model, models.EvidentialPlusModel): 
+            if isinstance(self.model, (models.EvidentialPlusModel, models.ConflictingEvidentialModel)): 
                 alpha_id = self.model.predict(self.id_x_test, for_threshold=True)
                 alpha_ood = self.model.predict(self.ood_x_test, for_threshold=True)
             else:
@@ -52,8 +56,8 @@ class ModelEvaluater:
     # evaluate the Id and OOD data
     def evaluate_data(self):
         if self.threshold == "pred_entropy":
-            id_predictions = self.model(self.id_x_test)
-            ood_predictions = self.model(self.ood_x_test)
+            id_predictions = self.model.predict_probs(self.id_x_test)
+            ood_predictions = self.model.predict_probs(self.ood_x_test)
         else:
             id_predictions = self.model.predict(self.id_x_test, verbose=0)
             ood_predictions = self.model.predict(self.ood_x_test, verbose=0)
@@ -90,7 +94,7 @@ class ModelEvaluater:
         _, adversarial_images, _ = attack(self.fmodel, images, criterion, epsilons=epsilons)
 
         if self.threshold == "pred_entropy":
-            adv_predictions = self.model(adversarial_images)
+            adv_predictions = self.model.predict_probs(adversarial_images)
         else:
             adv_predictions = self.model.predict(adversarial_images, verbose=0)
 

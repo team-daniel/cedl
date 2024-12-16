@@ -41,6 +41,13 @@ class StandardModel:
     
     def predict(self, inputs, verbose=0):
         return self.model.predict(inputs, verbose=verbose)
+    
+    def predict_probs(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
 
     def __call__(self, inputs):
         return self.model(inputs)
@@ -100,6 +107,13 @@ class EvidentialModel:
         evidence = self.model.predict(inputs, verbose=verbose)
         alpha = evidence + 1
         return alpha
+    
+    def predict_probs(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
 
     # get softmax like probs (needed for foolbox integration only)
     def __call__(self, inputs):
@@ -203,6 +217,20 @@ class EvidentialPlusModel:
         else:
             alpha = averaged_evidence + 1
         return alpha
+
+    def predict_probs(self, inputs, num_transforms=5, verbose=0, for_threshold=False):
+        original_evidence, averaged_evidence = self.predict_with_metamorphic_transforms(inputs, num_transforms)
+        if for_threshold:
+            original_evidence = tf.convert_to_tensor(original_evidence, dtype=tf.float32)
+            alpha = original_evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            probabilities = alpha / S
+        else:
+            averaged_evidence = tf.convert_to_tensor(averaged_evidence, dtype=tf.float32)
+            alpha = averaged_evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            probabilities = alpha / S
+        return probabilities       
 
     def __call__(self, inputs):
         evidence = self.model(inputs)
@@ -361,6 +389,20 @@ class ConflictingEvidentialModel:
         else:
             alpha = averaged_evidence + 1
         return alpha
+    
+    def predict_probs(self, inputs, num_transforms=5, verbose=0, for_threshold=False):
+        original_evidence, averaged_evidence = self.predict_with_metamorphic_transforms(inputs, num_transforms)
+        if for_threshold:
+            original_evidence = tf.convert_to_tensor(original_evidence, dtype=tf.float32)
+            alpha = original_evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            probabilities = alpha / S
+        else:
+            averaged_evidence = tf.convert_to_tensor(averaged_evidence, dtype=tf.float32)
+            alpha = averaged_evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            probabilities = alpha / S
+        return probabilities       
 
     def __call__(self, inputs):
         evidence = self.model(inputs)
@@ -368,3 +410,5 @@ class ConflictingEvidentialModel:
         S = tf.reduce_sum(alpha, axis=1, keepdims=True)
         probabilities = alpha / S
         return probabilities
+    
+
