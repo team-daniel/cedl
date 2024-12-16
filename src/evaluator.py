@@ -66,10 +66,23 @@ class ModelEvaluator:
         self.optimal_threshold = self.get_threshold()
         if self.threshold == Thresholds.PRED_ENTROPY:
             self.optimal_threshold = -self.optimal_threshold
-        print(f"Optimal Threshold: {self.optimal_threshold:.4f}") 
           
-        self.get_results(id_predictions, self.id_y_test, "ID")
-        self.get_results(ood_predictions, self.ood_y_test, "OOD")
+        id_accuracy, id_coverage, id_mean_evidence_delta = self.get_results(id_predictions, self.id_y_test, "ID")
+        _, ood_coverage, ood_mean_evidence_delta = self.get_results(ood_predictions, self.ood_y_test, "OOD")
+
+        results = {
+            "ID": {
+                "accuracy": id_accuracy,
+                "coverage": id_coverage,
+                "mean_evidence_delta": id_mean_evidence_delta,
+            },
+            "OOD": {
+                "coverage": ood_coverage,
+                "mean_evidence_delta": ood_mean_evidence_delta,
+            },
+            "optimal_threshold": self.optimal_threshold
+        }
+        return results
 
     # evaluate either dataset when attacked using foolbox
     def evaluate_attack(self, attack, dataset_type="ID", epsilons=1.5):
@@ -100,13 +113,20 @@ class ModelEvaluator:
             adv_predictions = self.model.predict(adversarial_images, verbose=0)
 
         if not self.optimal_threshold: self.evaluate_data()
-        self.get_results(adv_predictions, true_labels, f"Adversarial {dataset_type}")
+        _, adv_coverage, adv_mean_evidence_delta = self.get_results(adv_predictions, true_labels, f"Adversarial {dataset_type}")
 
         perturbations = adversarial_images - images
         perturbation_norms = tf.norm(tf.reshape(perturbations, (perturbations.shape[0], -1)), axis=1)
         avg_perturbation_norm = tf.reduce_mean(perturbation_norms).numpy()
 
-        print(f"Average L2 Norm of Perturbation: {avg_perturbation_norm:.4f}")
+        results = {
+            "ADV": {
+                "coverage": adv_coverage,
+                "mean_evidence_delta": adv_mean_evidence_delta,
+            },
+            "avg_perturbation": avg_perturbation_norm
+        }
+        return results
 
     # get results based off predicitons
     def get_results(self, predictions, true_labels, dataset_type):
@@ -135,6 +155,4 @@ class ModelEvaluator:
         delta = scores - self.optimal_threshold
         mean_evidence_delta = np.mean(delta)
 
-        print(f"Mean Delta on {dataset_type} data: {mean_evidence_delta:.4f}")
-        print(f"Accuracy on {dataset_type} data: {accuracy * 100:.2f}%")
-        print(f"Coverage on {dataset_type} data: {coverage * 100:.2f}%")
+        return accuracy, coverage, mean_evidence_delta

@@ -3,14 +3,51 @@ from utils import Datasets, Thresholds, Attacks
 import models
 from evaluator import ModelEvaluator
 
+import numpy as np
 
-dataset_manager = DatasetManager()
-x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = dataset_manager.get_dataset(Datasets.MNIST)
+id_accuracy = []
+id_coverage = []
+id_delta = []
+ood_coverage = []
+ood_delta = []
+adv_coverage = []
+adv_delta = []
+adv_perturbation = []
 
-model = models.EvidentialModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.01)
-model.train(batch_size=128, epochs=1, verbose=1)
+for i in range(2):
+    print(f"Run: {i}")
 
-evaluator = ModelEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.DIFF_ENTROPY)
-evaluator.evaluate_data()
+    dataset_manager = DatasetManager()
+    x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = dataset_manager.get_dataset(Datasets.MNIST)
 
-evaluator.evaluate_attack(Attacks.L2PGD, dataset_type="OOD", epsilons=1.0)
+    model = models.EvidentialModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.01)
+    model.train(batch_size=128, epochs=1, verbose=1)
+
+    evaluator = ModelEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.DIFF_ENTROPY)
+
+    results = evaluator.evaluate_data()
+
+    id_accuracy.append(results["ID"]["accuracy"])
+    id_coverage.append(results["ID"]["coverage"])
+    id_delta.append(results["ID"]["mean_evidence_delta"])
+    ood_coverage.append(results["OOD"]["coverage"])
+    ood_delta.append(results["OOD"]["mean_evidence_delta"])
+
+    results = evaluator.evaluate_attack(Attacks.L2PGD, dataset_type="OOD", epsilons=1.0)
+
+    adv_coverage.append(results["ADV"]["coverage"])
+    adv_delta.append(results["ADV"]["mean_evidence_delta"])
+    adv_perturbation.append(results["avg_perturbation"])
+
+print("========================")
+print(f"Mean Accuracy on ID data: {np.mean(id_accuracy) * 100:.4f} +/- {np.std(id_accuracy) * 100:.4f}")
+print(f"Mean Coverage on ID data: {np.mean(id_coverage) * 100:.4f} +/- {np.std(id_coverage) * 100:.4f}")
+print(f"Mean Delta on ID data: {np.mean(id_delta):.4f} +/- {np.std(id_delta):.4f}")
+print("========================")
+print(f"Mean Coverage on OOD data: {np.mean(ood_coverage) * 100:.4f} +/- {np.std(ood_coverage) * 100:.4f}")
+print(f"Mean Delta on OOD data: {np.mean(ood_delta):.4f} +/- {np.std(ood_delta):.4f}")
+print("========================")
+print(f"Mean Coverage on ADV data: {np.mean(adv_coverage) * 100:.4f} +/- {np.std(adv_coverage) * 100:.4f}")
+print(f"Mean Delta on ADV data: {np.mean(adv_delta):.4f} +/- {np.std(adv_delta):.4f}")
+print(f"Mean Perturbation on ADV data: {np.mean(adv_perturbation):.4f} +/- {np.std(adv_perturbation):.4f}")
+print("========================")
