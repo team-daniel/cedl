@@ -2,25 +2,35 @@
 
 text here
 
-# Models
+## Models
+
 Currently support:
+
 - Deep Neural Network
+- MCDropout Network
+- - Uses Adaptive MC Dropout (Bethell, et al. 2024) to ensures enough fwd passes.
 - Evidential Network
 - Evidential++ Network
 - - Similar to the Conflicting Evidential Network but without the conflicting evidence reduction, only the metamorphic transformation.
 - Conflicting Evidential Network
 
-# Threshold Metrics
+## Threshold Metrics
+
 Currently support:
+
 - Predictive Entropy
 - Differential Entropy
 
-# Attacks
+## Attacks
+
 Currently support:
+
 - L2PGD
 - LinfPGD
 
-# Datasets
+## Datasets
+
 Currently support:
+
 - MNIST
 - FashionMNIST

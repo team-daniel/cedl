@@ -1,9 +1,9 @@
 import scipy.ndimage
 import tensorflow as tf
 import numpy as np
-import sklearn
 import random
 import scipy
+from tqdm import tqdm
 
 class StandardModel:
     def __init__(self, x_train, y_train, learning_rate=0.01):
@@ -45,6 +45,85 @@ class StandardModel:
     
     def predict_probs(self, inputs):
         evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
+
+    def __call__(self, inputs):
+        return self.model(inputs)
+    
+class MCDropoutModel:
+    def __init__(self, x_train, y_train, learning_rate=0.01):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.input_shape = x_train.shape[1:]
+        self.learning_rate = learning_rate
+
+        self.num_classes = y_train.shape[1]
+
+        self.delta = 1e-4
+        self.patience = 10
+        self.num_mc_samples = 1000
+
+        self.model = self._build_model()
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.model.compile(optimizer=self.optimizer,
+                           loss='categorical_crossentropy',
+                           metrics=['accuracy'])
+
+    def _build_model(self):
+        input = tf.keras.layers.Input(shape=self.input_shape)
+        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.Dense(120, activation='tanh')(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        output = tf.keras.layers.Dense(self.num_classes, activation='softmax')(x)
+        return tf.keras.models.Model(inputs=input, outputs=output)
+
+    def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        history = self.model.fit(self.x_train, self.y_train,
+                                 batch_size=batch_size,
+                                 epochs=epochs,
+                                 validation_split=validation_split,
+                                 verbose=verbose)
+        return history
+    
+    def adaptive_mc_predict(self, inputs):
+        mc_preds_list = []
+        for batch_image in tqdm(inputs, desc="Processing inputs"):
+            batch_image = np.expand_dims(batch_image, axis=0)
+            mc_preds = []
+            prev_variance = None
+            current_patience_count = 0
+            for i in range(self.num_mc_samples):
+                preds = self.model(batch_image, training=True)
+                mc_preds.append(preds)
+                if len(mc_preds) > 1:
+                    current_variance = np.std(mc_preds, axis=0)
+                    if prev_variance is not None:
+                        var_diff = np.abs(current_variance - prev_variance)
+                        if np.all(var_diff <= self.delta):
+                            current_patience_count += 1
+                        else:
+                            current_patience_count = 0
+                        if current_patience_count >= self.patience:
+                            break
+                    prev_variance = current_variance
+            mc_preds = np.array(mc_preds)
+            mean_preds = np.mean(mc_preds, axis=0)
+            mc_preds_list.append(mean_preds)
+        return np.array(mc_preds_list)
+    
+    def predict(self, inputs, verbose=0):
+        return self.adaptive_mc_predict(inputs)
+    
+    def predict_probs(self, inputs):
+        evidence = self.adaptive_mc_predict(inputs)
         alpha = evidence + 1
         S = tf.reduce_sum(alpha, axis=1, keepdims=True)
         probabilities = alpha / S

@@ -9,16 +9,16 @@ id_accuracy, id_coverage, id_delta = [], [], []
 ood_coverage, ood_delta = [], []
 adv_coverage, adv_delta, adv_perturbation = [], [], []
 
-for i in range(2):
+for i in range(1):
     print(f"Run: {i}")
 
     dataset_manager = DatasetManager()
     x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = dataset_manager.get_dataset(Datasets.MNIST)
 
-    model = models.StandardModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.01)
+    model = models.MCDropoutModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.01)
     model.train(batch_size=128, epochs=1, verbose=1)
 
-    evaluator = ModelEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.PRED_ENTROPY)
+    evaluator = ModelEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.DIFF_ENTROPY)
 
     results = evaluator.evaluate_data()
 
@@ -28,11 +28,11 @@ for i in range(2):
     ood_coverage.append(results["OOD"]["coverage"])
     ood_delta.append(results["OOD"]["mean_evidence_delta"])
 
-    results = evaluator.evaluate_attack(Attacks.L2PGD, dataset_type="OOD", epsilons=1.0)
+    #results = evaluator.evaluate_attack(Attacks.L2PGD, dataset_type="OOD", epsilons=1.0)
 
-    adv_coverage.append(results["ADV"]["coverage"])
-    adv_delta.append(results["ADV"]["mean_evidence_delta"])
-    adv_perturbation.append(results["avg_perturbation"])
+    #adv_coverage.append(results["ADV"]["coverage"])
+    #adv_delta.append(results["ADV"]["mean_evidence_delta"])
+    #adv_perturbation.append(results["avg_perturbation"])
 
 print("========================")
 print(f"Mean Accuracy on ID data: {np.mean(id_accuracy) * 100:.4f} +/- {np.std(id_accuracy) * 100:.4f}")
