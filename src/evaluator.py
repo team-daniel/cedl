@@ -141,7 +141,8 @@ class ModelEvaluator:
 
         if len(indices) == 0:
                 print(f"No predictions made for {dataset_type}. Coverage: 0.00%")
-                return float('nan'), 0.0
+                mean_evidence_delta = np.mean(scores - self.optimal_threshold)
+                return 0.0, 0.0, mean_evidence_delta
         
         predictions_made = tf.gather(predictions, indices)
         labels_made = tf.gather(true_labels, indices)

@@ -18,7 +18,7 @@ for i in range(1):
     model = models.MCDropoutModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.01)
     model.train(batch_size=128, epochs=1, verbose=1)
 
-    evaluator = ModelEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.DIFF_ENTROPY)
+    evaluator = ModelEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.PRED_ENTROPY)
 
     results = evaluator.evaluate_data()
 

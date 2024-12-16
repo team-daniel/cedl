@@ -102,6 +102,7 @@ class MCDropoutModel:
             current_patience_count = 0
             for i in range(self.num_mc_samples):
                 preds = self.model(batch_image, training=True)
+                preds = preds.numpy().squeeze()
                 mc_preds.append(preds)
                 if len(mc_preds) > 1:
                     current_variance = np.std(mc_preds, axis=0)
