@@ -15,21 +15,18 @@ def get_optimal_threshold(alpha_id, alpha_ood, metric="diff_entropy"):
 
     fpr, tpr, thresholds = sklearn.metrics.roc_curve(corrects, scores)
     auc_score = sklearn.metrics.auc(fpr, tpr)
-
+    
     youden_index = tpr - fpr
     optimal_idx = np.argmax(youden_index)
     optimal_threshold = thresholds[optimal_idx]
-
+    
     return auc_score, fpr, tpr, thresholds, optimal_threshold
 
-def pred_entropy(alpha):
+def pred_entropy(probabilities):
     eps = 1e-6
-    alpha = alpha + eps
-    alpha0 = np.sum(alpha, axis=1, keepdims=True)
-    expected_probs = alpha / alpha0
-    predictive_entropy = -np.sum(expected_probs * np.log(expected_probs + eps), axis=1)
-    normalized_entropy = predictive_entropy / np.log(expected_probs.shape[1])  # Normalize by log(C)
-    return normalized_entropy
+    entropy = -np.sum(probabilities * np.log(probabilities + eps), axis=1)
+    normalized_entropy = entropy / np.log(probabilities.shape[1])  # Normalize by log(C)
+    return -normalized_entropy
 
 def diff_entropy(alpha):
     eps = 1e-6

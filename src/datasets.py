@@ -1,9 +1,6 @@
 import tensorflow as tf
 import numpy as np
 
-"""
-A class that pulls and preprocesses datasets.
-"""
 class DatasetManager:
     def __init__(self):
         self.datasets = {

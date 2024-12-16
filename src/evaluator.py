@@ -32,15 +32,19 @@ class ModelEvaluater:
 
     # get the ID-OOD threshold
     def get_threshold(self):
-        if self.threshold == "diff_entropy" and not isinstance(self.model, (models.EvidentialModel)):
+        if self.threshold == "diff_entropy" and not isinstance(self.model, (models.EvidentialModel, models.EvidentialPlusModel)):
                 raise RuntimeError("Differential Entropy threshold is only allowed for Evidential-based models.")
         
         if self.threshold == "pred_entropy":
             alpha_id = self.model(self.id_x_test)
             alpha_ood = self.model(self.ood_x_test)
         else:
-            alpha_id = self.model.predict(self.id_x_test, verbose=0)
-            alpha_ood = self.model.predict(self.ood_x_test, verbose=0)
+            if isinstance(self.model, models.EvidentialPlusModel): 
+                alpha_id = self.model.predict(self.id_x_test, for_threshold=True)
+                alpha_ood = self.model.predict(self.ood_x_test, for_threshold=True)
+            else:
+                alpha_id = self.model.predict(self.id_x_test, verbose=0)
+                alpha_ood = self.model.predict(self.ood_x_test, verbose=0)
         _, _, _, _, optimal_threshold = metrics.get_optimal_threshold(alpha_id, alpha_ood, metric=self.threshold)
 
         return optimal_threshold
@@ -61,6 +65,43 @@ class ModelEvaluater:
           
         self.get_results(id_predictions, self.id_y_test, "ID")
         self.get_results(ood_predictions, self.ood_y_test, "OOD")
+
+    # evaluate either dataset when attacked using foolbox
+    def evaluate_attack(self, attack, dataset_type="ID", epsilons=1.5):
+        if dataset_type == "ID":
+            images = tf.convert_to_tensor(self.id_x_test)
+            labels = tf.convert_to_tensor(np.argmax(self.id_y_test, axis=1))
+            true_labels = self.id_y_test
+        elif dataset_type == "OOD":
+            images = tf.convert_to_tensor(self.ood_x_test)
+            labels = tf.convert_to_tensor(np.argmax(self.ood_y_test, axis=1))
+            true_labels = self.ood_y_test
+        else:
+            raise ValueError("dataset_type must be either 'ID' or 'OOD'.")
+
+        if attack == "l2pgd":
+            attack = foolbox.attacks.L2PGD()
+        elif attack == "linfpgd":
+            attack = foolbox.attacks.LinfPGD()
+        else:
+            raise ValueError("Unsupported attack.")
+
+        criterion = foolbox.criteria.Misclassification(labels)
+        _, adversarial_images, _ = attack(self.fmodel, images, criterion, epsilons=epsilons)
+
+        if self.threshold == "pred_entropy":
+            adv_predictions = self.model(adversarial_images)
+        else:
+            adv_predictions = self.model.predict(adversarial_images, verbose=0)
+
+        if not self.optimal_threshold: self.evaluate_data()
+        self.get_results(adv_predictions, true_labels, f"Adversarial {dataset_type}")
+
+        perturbations = adversarial_images - images
+        perturbation_norms = tf.norm(tf.reshape(perturbations, (perturbations.shape[0], -1)), axis=1)
+        avg_perturbation_norm = tf.reduce_mean(perturbation_norms).numpy()
+
+        print(f"Average L2 Norm of Perturbation: {avg_perturbation_norm:.4f}")
 
     # get results based off predicitons
     def get_results(self, predictions, true_labels, dataset_type):
