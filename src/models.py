@@ -22,13 +22,14 @@ class StandardModel:
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(32, (3, 3), activation='relu')(input)
-        x = tf.keras.layers.MaxPooling2D((2, 2))(x)
-        x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu')(x)
-        x = tf.keras.layers.MaxPooling2D((2, 2))(x)
+        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(128, activation='relu')(x)
-        output = tf.keras.layers.Dense(self.num_classes, activation='softmax')(x)  # Softmax for probabilities
+        x = tf.keras.layers.Dense(120, activation='tanh')(x)
+        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        output = tf.keras.layers.Dense(self.num_classes, activation='softmax')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
@@ -85,12 +86,13 @@ class EvidentialModel:
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(32, (3, 3), activation='relu')(input)
-        x = tf.keras.layers.MaxPooling2D((2, 2))(x)
-        x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu')(x)
-        x = tf.keras.layers.MaxPooling2D((2, 2))(x)
+        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(128, activation='relu')(x)
+        x = tf.keras.layers.Dense(120, activation='tanh')(x)
+        x = tf.keras.layers.Dense(84, activation='tanh')(x)
         output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
@@ -156,12 +158,13 @@ class EvidentialPlusModel:
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(32, (3, 3), activation='relu')(input)
-        x = tf.keras.layers.MaxPooling2D((2, 2))(x)
-        x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu')(x)
-        x = tf.keras.layers.MaxPooling2D((2, 2))(x)
+        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(128, activation='relu')(x)
+        x = tf.keras.layers.Dense(120, activation='tanh')(x)
+        x = tf.keras.layers.Dense(84, activation='tanh')(x)
         output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
@@ -272,12 +275,13 @@ class ConflictingEvidentialModel:
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(32, (3, 3), activation='relu')(input)
-        x = tf.keras.layers.MaxPooling2D((2, 2))(x)
-        x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu')(x)
-        x = tf.keras.layers.MaxPooling2D((2, 2))(x)
+        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(128, activation='relu')(x)
+        x = tf.keras.layers.Dense(120, activation='tanh')(x)
+        x = tf.keras.layers.Dense(84, activation='tanh')(x)
         output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 

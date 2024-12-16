@@ -5,14 +5,9 @@ from evaluator import ModelEvaluator
 
 import numpy as np
 
-id_accuracy = []
-id_coverage = []
-id_delta = []
-ood_coverage = []
-ood_delta = []
-adv_coverage = []
-adv_delta = []
-adv_perturbation = []
+id_accuracy, id_coverage, id_delta = [], [], []
+ood_coverage, ood_delta = [], []
+adv_coverage, adv_delta, adv_perturbation = [], [], []
 
 for i in range(2):
     print(f"Run: {i}")
@@ -20,10 +15,10 @@ for i in range(2):
     dataset_manager = DatasetManager()
     x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = dataset_manager.get_dataset(Datasets.MNIST)
 
-    model = models.EvidentialModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.01)
+    model = models.StandardModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.01)
     model.train(batch_size=128, epochs=1, verbose=1)
 
-    evaluator = ModelEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.DIFF_ENTROPY)
+    evaluator = ModelEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.PRED_ENTROPY)
 
     results = evaluator.evaluate_data()
 
