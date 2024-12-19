@@ -44,10 +44,7 @@ class StandardModel:
         return self.model.predict(inputs, verbose=verbose)
     
     def predict_probs(self, inputs):
-        evidence = self.model(inputs)
-        alpha = evidence + 1
-        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
-        probabilities = alpha / S
+        probabilities = self.model(inputs)
         return probabilities
 
     def __call__(self, inputs):
@@ -129,10 +126,7 @@ class MCDropoutModel:
         return self.adaptive_mc_predict(inputs)
     
     def predict_probs(self, inputs):
-        evidence = self.adaptive_mc_predict(inputs)
-        alpha = evidence + 1
-        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
-        probabilities = alpha / S
+        probabilities = self.adaptive_mc_predict(inputs)
         return probabilities
 
     def __call__(self, inputs):
