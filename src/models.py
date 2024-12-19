@@ -94,31 +94,36 @@ class MCDropoutModel:
         return history
     
     def adaptive_mc_predict(self, inputs):
-        mc_preds_list = []
-        for batch_image in tqdm(inputs, desc="Processing inputs"):
-            batch_image = np.expand_dims(batch_image, axis=0)
-            mc_preds = []
-            prev_variance = None
-            current_patience_count = 0
-            for i in range(self.num_mc_samples):
-                preds = self.model(batch_image, training=True)
-                preds = preds.numpy().squeeze()
-                mc_preds.append(preds)
-                if len(mc_preds) > 1:
-                    current_variance = np.std(mc_preds, axis=0)
-                    if prev_variance is not None:
-                        var_diff = np.abs(current_variance - prev_variance)
+        num_samples = len(inputs)
+        mc_preds_list = [[] for _ in range(num_samples)]
+        prev_variances = [None] * num_samples
+        patience_counts = [0] * num_samples
+        active_indices = list(range(num_samples))
+        for i in tqdm(range(self.num_mc_samples), desc="Processing inputs"):
+            if not active_indices:
+                break
+            active_inputs = inputs[active_indices]
+            preds = self.model(active_inputs, training=True).numpy()
+            to_remove = []
+            for j, idx in enumerate(active_indices):
+                mc_preds_list[idx].append(preds[j])
+                if len(mc_preds_list[idx]) > 1:
+                    current_variance = np.std(mc_preds_list[idx], axis=0)
+                    if prev_variances[idx] is not None:
+                        var_diff = np.abs(current_variance - prev_variances[idx])
                         if np.all(var_diff <= self.delta):
-                            current_patience_count += 1
+                            patience_counts[idx] += 1
                         else:
-                            current_patience_count = 0
-                        if current_patience_count >= self.patience:
-                            break
-                    prev_variance = current_variance
-            mc_preds = np.array(mc_preds)
-            mean_preds = np.mean(mc_preds, axis=0)
-            mc_preds_list.append(mean_preds)
-        return np.array(mc_preds_list)
+                            patience_counts[idx] = 0
+
+                        if patience_counts[idx] >= self.patience:
+                            to_remove.append(idx)
+                    prev_variances[idx] = current_variance
+            active_indices = [idx for idx in active_indices if idx not in to_remove]
+        mean_preds = [np.mean(mc_preds, axis=0) for mc_preds in mc_preds_list]
+        mean_fwd_passes = [len(mc_preds) for mc_preds in mc_preds_list]
+        print("Mean number of forward passes per input:", np.mean(mean_fwd_passes))
+        return np.array(mean_preds)
     
     def predict(self, inputs, verbose=0):
         return self.adaptive_mc_predict(inputs)
