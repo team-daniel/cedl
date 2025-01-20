@@ -132,13 +132,12 @@ class MCDropoutModel:
     def __call__(self, inputs):
         return self.model(inputs)
 
- 
 class PosteriorModel:
-    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+    def __init__(self, x_train, y_train, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
-        self.kl_weight = kl_weight
+        self.kl_weight = 1.0
         self.learning_rate = learning_rate
 
         self.num_classes = y_train.shape[1]
@@ -182,11 +181,20 @@ class PosteriorModel:
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        class WeightCallback(tf.keras.callbacks.Callback):
+            def __init__(self, parent):
+                self.parent = parent
+
+            def on_epoch_begin(self, epoch, logs=None):
+                self.parent.kl_weight = min(1.0, epoch / 10.0)
+
+        callback = WeightCallback(self)
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
-                                 verbose=verbose)
+                                 verbose=verbose,
+                                 callbacks=[callback])
         return history
 
     # get alphas
@@ -209,14 +217,13 @@ class PosteriorModel:
         S = tf.reduce_sum(alpha, axis=1, keepdims=True)
         probabilities = alpha / S
         return probabilities
-    
-    
+     
 class EvidentialModel:
-    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+    def __init__(self, x_train, y_train, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
-        self.kl_weight = kl_weight
+        self.kl_weight = 1.0
         self.learning_rate = learning_rate
 
         self.num_classes = y_train.shape[1]
@@ -255,11 +262,20 @@ class EvidentialModel:
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        class WeightCallback(tf.keras.callbacks.Callback):
+            def __init__(self, parent):
+                self.parent = parent
+
+            def on_epoch_begin(self, epoch, logs=None):
+                self.parent.kl_weight = min(1.0, epoch / 10.0)
+
+        callback = WeightCallback(self)
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
-                                 verbose=verbose)
+                                 verbose=verbose,
+                                 callbacks=[callback])
         return history
 
     # get alphas
@@ -283,15 +299,14 @@ class EvidentialModel:
         probabilities = alpha / S
         return probabilities
 
-
 class InformationEvidentialModel:
-    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+    def __init__(self, x_train, y_train, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
-        self.kl_weight = kl_weight
+        self.kl_weight = 1.0
         self.learning_rate = learning_rate
-        self.fisher_weight = 0.001
+        self.fisher_weight = 1.0
 
         self.num_classes = y_train.shape[1]
 
@@ -334,11 +349,21 @@ class InformationEvidentialModel:
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        class FisherWeightCallback(tf.keras.callbacks.Callback):
+            def __init__(self, parent):
+                self.parent = parent
+
+            def on_epoch_begin(self, epoch, logs=None):
+                self.parent.kl_weight = min(1.0, epoch / 10.0)
+                self.parent.fisher_weight = min(1.0, epoch / 10.0)
+
+        fisher_callback = FisherWeightCallback(self)
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
-                                 verbose=verbose)
+                                 verbose=verbose,
+                                 callbacks=[fisher_callback])
         return history
 
     # get alphas
@@ -362,13 +387,12 @@ class InformationEvidentialModel:
         probabilities = alpha / S
         return probabilities
     
-
 class EvidentialPlusModel:
-    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+    def __init__(self, x_train, y_train, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
-        self.kl_weight = kl_weight
+        self.kl_weight = 1.0
         self.learning_rate = learning_rate
 
         self.num_classes = y_train.shape[1]
@@ -407,11 +431,20 @@ class EvidentialPlusModel:
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        class WeightCallback(tf.keras.callbacks.Callback):
+            def __init__(self, parent):
+                self.parent = parent
+
+            def on_epoch_begin(self, epoch, logs=None):
+                self.parent.kl_weight = min(1.0, epoch / 10.0)
+
+        callback = WeightCallback(self)
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
-                                 verbose=verbose)
+                                 verbose=verbose,
+                                 callbacks=[callback])
         return history
 
     def apply_random_transformation(self, inputs):
@@ -481,11 +514,11 @@ class EvidentialPlusModel:
         return probabilities
     
 class ConflictingEvidentialModel:
-    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+    def __init__(self, x_train, y_train, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
-        self.kl_weight = kl_weight
+        self.kl_weight = 1.0
         self.learning_rate = learning_rate
 
         self.num_classes = y_train.shape[1]
@@ -524,11 +557,20 @@ class ConflictingEvidentialModel:
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        class WeightCallback(tf.keras.callbacks.Callback):
+            def __init__(self, parent):
+                self.parent = parent
+
+            def on_epoch_begin(self, epoch, logs=None):
+                self.parent.kl_weight = min(1.0, epoch / 10.0)
+
+        callback = WeightCallback(self)
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
-                                 verbose=verbose)
+                                 verbose=verbose,
+                                 callbacks=[callback])
         return history
 
     def apply_random_transformation(self, inputs):
