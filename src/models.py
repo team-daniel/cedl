@@ -131,6 +131,85 @@ class MCDropoutModel:
 
     def __call__(self, inputs):
         return self.model(inputs)
+
+ 
+class PosteriorModel:
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.input_shape = x_train.shape[1:]
+        self.kl_weight = kl_weight
+        self.learning_rate = learning_rate
+
+        self.num_classes = y_train.shape[1]
+
+        self.model = self._build_model()
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.model.compile(optimizer=self.optimizer,
+                           loss=self._posterior_loss(),
+                           metrics=['accuracy'])
+
+    def _posterior_loss(self):
+        def loss_fn(y_true, outputs):
+            alpha = outputs + 1.0
+            alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            pred = alpha / alpha_sum
+            
+            ce = tf.keras.losses.categorical_crossentropy(y_true, pred)
+            
+            k = tf.cast(tf.shape(alpha)[1], tf.float32)
+            sum_alpha = tf.reduce_sum(alpha, axis=1, keepdims=True)
+
+            term1 = tf.math.lgamma(sum_alpha) - tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
+            term2 = tf.reduce_sum(tf.math.lgamma(tf.ones_like(alpha)), axis=1, keepdims=True) - tf.math.lgamma(k)
+            term3 = tf.reduce_sum((alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(sum_alpha)), axis=1, keepdims=True)
+            kl = term1 + term2 + term3        
+            kl = tf.reduce_mean(kl)
+            
+            return ce + self.kl_weight * kl
+        return loss_fn
+
+    def _build_model(self):
+        input = tf.keras.layers.Input(shape=self.input_shape)
+        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.Dense(120, activation='tanh')(x)
+        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
+        return tf.keras.models.Model(inputs=input, outputs=output)
+
+    def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        history = self.model.fit(self.x_train, self.y_train,
+                                 batch_size=batch_size,
+                                 epochs=epochs,
+                                 validation_split=validation_split,
+                                 verbose=verbose)
+        return history
+
+    # get alphas
+    def predict(self, inputs, verbose=0):
+        evidence = self.model.predict(inputs, verbose=verbose)
+        alpha = evidence + 1
+        return alpha
+    
+    def predict_probs(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
+
+    # get softmax like probs (needed for foolbox integration only)
+    def __call__(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
+    
     
 class EvidentialModel:
     def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
@@ -203,7 +282,87 @@ class EvidentialModel:
         S = tf.reduce_sum(alpha, axis=1, keepdims=True)
         probabilities = alpha / S
         return probabilities
+
+
+class InformationEvidentialModel:
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.input_shape = x_train.shape[1:]
+        self.kl_weight = kl_weight
+        self.learning_rate = learning_rate
+        self.fisher_weight = 0.001
+
+        self.num_classes = y_train.shape[1]
+
+        self.model = self._build_model()
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.model.compile(optimizer=self.optimizer,
+                           loss=self._fisher_evidential_loss(),
+                           metrics=['accuracy'])
+
+    def _fisher_evidential_loss(self):
+        def loss_fn(y_true, outputs):
+            evidence = outputs
+            alpha = evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            m = alpha / S
+
+            err = tf.reduce_sum((y_true - m) ** 2, axis=1)
+            var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
+            kl_divergence = self.kl_weight * tf.reduce_sum((alpha - 1), axis=1)
+
+            trigamma_alpha = tf.math.polygamma(1.0, alpha)
+            trigamma_alpha0 = tf.math.polygamma(1.0, S)
+            fisher_term = tf.reduce_sum(tf.math.log(trigamma_alpha), axis=1) + \
+                      tf.math.log(1.0 - tf.reduce_sum(trigamma_alpha0 / trigamma_alpha, axis=1))
+            fisher_loss = self.fisher_weight * fisher_term
+
+            return tf.reduce_mean(err + var + kl_divergence + fisher_loss)  
+        return loss_fn
+
+    def _build_model(self):
+        input = tf.keras.layers.Input(shape=self.input_shape)
+        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.Dense(120, activation='tanh')(x)
+        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
+        return tf.keras.models.Model(inputs=input, outputs=output)
+
+    def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        history = self.model.fit(self.x_train, self.y_train,
+                                 batch_size=batch_size,
+                                 epochs=epochs,
+                                 validation_split=validation_split,
+                                 verbose=verbose)
+        return history
+
+    # get alphas
+    def predict(self, inputs, verbose=0):
+        evidence = self.model.predict(inputs, verbose=verbose)
+        alpha = evidence + 1
+        return alpha
     
+    def predict_probs(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
+
+    # get softmax like probs (needed for foolbox integration only)
+    def __call__(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
+    
+
 class EvidentialPlusModel:
     def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
         self.x_train = x_train

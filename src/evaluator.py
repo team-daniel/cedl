@@ -14,8 +14,8 @@ class ModelEvaluator:
         self.id_dataset_name = id_dataset_name
         self.ood_dataset_name = ood_dataset_name
 
-        self.id_x_train, self.id_y_train, self.id_x_test, self.id_y_test = self.dataset_manager.get_dataset(self.id_dataset_name)
-        self.ood_x_train, self.ood_y_train, self.ood_x_test, self.ood_y_test = self.dataset_manager.get_dataset(self.ood_dataset_name)
+        _, _, self.id_x_test, self.id_y_test = self.dataset_manager.get_dataset(self.id_dataset_name)
+        _, _, self.ood_x_test, self.ood_y_test = self.dataset_manager.get_dataset(self.ood_dataset_name)
         self._check_dataset_shapes()
 
         self.model = model
@@ -33,7 +33,7 @@ class ModelEvaluator:
 
     # get the ID-OOD threshold
     def get_threshold(self):
-        if self.threshold == Thresholds.DIFF_ENTROPY and not isinstance(self.model, (models.EvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel)):
+        if self.threshold == Thresholds.DIFF_ENTROPY and not isinstance(self.model, (models.EvidentialModel, models.InformationEvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel, models.PosteriorModel)):
                 raise RuntimeError("Differential Entropy threshold is only allowed for Evidential-based models.")
         
         if self.threshold == Thresholds.PRED_ENTROPY:
