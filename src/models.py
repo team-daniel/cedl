@@ -387,6 +387,99 @@ class InformationEvidentialModel:
         probabilities = alpha / S
         return probabilities
     
+class SmoothedEvidentialModel:
+    def __init__(self, x_train, y_train, learning_rate=0.01):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.input_shape = x_train.shape[1:]
+        self.kl_weight = 1.0
+        self.learning_rate = learning_rate
+        self.sigma = 0.1
+        self.num_samples = 50
+
+        self.num_classes = y_train.shape[1]
+
+        self.model = self._build_model()
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.model.compile(optimizer=self.optimizer,
+                           loss=self._evidential_loss(),
+                           metrics=['accuracy'])
+
+    def _evidential_loss(self):
+        def loss_fn(y_true, outputs):
+            evidence = outputs
+            alpha = evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            m = alpha / S
+
+            err = tf.reduce_sum((y_true - m) ** 2, axis=1)
+            var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
+            loss = err + var
+
+            kl_divergence = self.kl_weight * tf.reduce_sum((alpha - 1), axis=1)
+            return tf.reduce_mean(loss + kl_divergence)
+        return loss_fn
+
+    def _build_model(self):
+        input = tf.keras.layers.Input(shape=self.input_shape)
+        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
+        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.Dense(120, activation='tanh')(x)
+        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
+        return tf.keras.models.Model(inputs=input, outputs=output)
+
+    def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        class WeightCallback(tf.keras.callbacks.Callback):
+            def __init__(self, parent):
+                self.parent = parent
+
+            def on_epoch_begin(self, epoch, logs=None):
+                self.parent.kl_weight = min(1.0, epoch / 10.0)
+
+        callback = WeightCallback(self)
+        history = self.model.fit(self.x_train, self.y_train,
+                                 batch_size=batch_size,
+                                 epochs=epochs,
+                                 validation_split=validation_split,
+                                 verbose=verbose,
+                                 callbacks=[callback])
+        return history
+    
+    def _generate_samples(self, inputs):
+        """Generate perturbed samples from a Gaussian distribution."""
+        batch_size, height, width, channels = inputs.shape
+        noise = np.random.normal(loc=0.0, scale=self.sigma, size=(self.num_samples, batch_size, height, width, channels))
+        perturbed_samples = inputs[None, :, :, :, :] + noise
+        perturbed_samples = np.reshape(perturbed_samples, (-1, height, width, channels))
+        return perturbed_samples
+
+    def predict(self, inputs, verbose=0):
+        perturbed_samples = self._generate_samples(inputs)
+        evidence = self.model.predict(perturbed_samples, verbose=0)
+        evidence = np.reshape(evidence, (self.num_samples, -1, self.num_classes))
+        alpha = evidence + 1
+        smoothed_alphas = np.median(alpha, axis=0)
+        return smoothed_alphas
+    
+    def predict_probs(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
+
+    # get softmax like probs (needed for foolbox integration only)
+    def __call__(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
+
 class EvidentialPlusModel:
     def __init__(self, x_train, y_train, learning_rate=0.01):
         self.x_train = x_train

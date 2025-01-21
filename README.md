@@ -12,6 +12,7 @@ Currently support:
 - Posterior Network
 - Evidential Network
 - Fisher-Information Evidential Network
+- Smoothed Evidential Network
 - Evidential++ Network
 - - Similar to the Conflicting Evidential Network but without the conflicting evidence reduction, only the metamorphic transformation.
 - Conflicting Evidential Network

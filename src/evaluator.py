@@ -33,7 +33,7 @@ class ModelEvaluator:
 
     # get the ID-OOD threshold
     def get_threshold(self):
-        if self.threshold == Thresholds.DIFF_ENTROPY and not isinstance(self.model, (models.EvidentialModel, models.InformationEvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel, models.PosteriorModel)):
+        if self.threshold == Thresholds.DIFF_ENTROPY and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel, models.PosteriorModel)):
                 raise RuntimeError("Differential Entropy threshold is only allowed for Evidential-based models.")
         
         if self.threshold == Thresholds.PRED_ENTROPY:
@@ -67,18 +67,22 @@ class ModelEvaluator:
         if self.threshold == Thresholds.PRED_ENTROPY:
             self.optimal_threshold = -self.optimal_threshold
           
-        id_accuracy, id_coverage, id_mean_evidence_delta = self.get_results(id_predictions, self.id_y_test, "ID")
-        _, ood_coverage, ood_mean_evidence_delta = self.get_results(ood_predictions, self.ood_y_test, "OOD")
+        id_accuracy, id_coverage, id_mean_evidence_delta, id_mean_evidence_below_delta, id_mean_evidence_above_delta = self.get_results(id_predictions, self.id_y_test, "ID")
+        _, ood_coverage, ood_mean_evidence_delta, ood_mean_evidence_below_delta, ood_mean_evidence_above_delta = self.get_results(ood_predictions, self.ood_y_test, "OOD")
 
         results = {
             "ID": {
                 "accuracy": id_accuracy,
                 "coverage": id_coverage,
                 "mean_evidence_delta": id_mean_evidence_delta,
+                "mean_evidence_below_delta": id_mean_evidence_below_delta,
+                "mean_evidence_above_delta": id_mean_evidence_above_delta,
             },
             "OOD": {
                 "coverage": ood_coverage,
                 "mean_evidence_delta": ood_mean_evidence_delta,
+                "mean_evidence_below_delta": ood_mean_evidence_below_delta,
+                "mean_evidence_above_delta": ood_mean_evidence_above_delta,
             },
             "optimal_threshold": self.optimal_threshold
         }
@@ -113,7 +117,7 @@ class ModelEvaluator:
             adv_predictions = self.model.predict(adversarial_images, verbose=0)
 
         if not self.optimal_threshold: self.evaluate_data()
-        _, adv_coverage, adv_mean_evidence_delta = self.get_results(adv_predictions, true_labels, f"Adversarial {dataset_type}")
+        _, adv_coverage, adv_mean_evidence_delta, adv_mean_evidence_below_delta, adv_mean_evidence_above_delta = self.get_results(adv_predictions, true_labels, f"Adversarial {dataset_type}")
 
         perturbations = adversarial_images - images
         perturbation_norms = tf.norm(tf.reshape(perturbations, (perturbations.shape[0], -1)), axis=1)
@@ -123,6 +127,8 @@ class ModelEvaluator:
             "ADV": {
                 "coverage": adv_coverage,
                 "mean_evidence_delta": adv_mean_evidence_delta,
+                "mean_evidence_below_delta": adv_mean_evidence_below_delta,
+                "mean_evidence_above_delta": adv_mean_evidence_above_delta
             },
             "avg_perturbation": avg_perturbation_norm
         }
@@ -140,9 +146,9 @@ class ModelEvaluator:
         indices = tf.convert_to_tensor(np.where(decision)[0], dtype=tf.int32)
 
         if len(indices) == 0:
-                print(f"No predictions made for {dataset_type}. Coverage: 0.00%")
-                mean_evidence_delta = np.mean(scores - self.optimal_threshold)
-                return 0.0, 0.0, mean_evidence_delta
+            print(f"No predictions made for {dataset_type}. Coverage: 0.00%")
+            mean_evidence_delta = np.mean(scores - self.optimal_threshold)
+            return 0.0, 0.0, mean_evidence_delta
         
         predictions_made = tf.gather(predictions, indices)
         labels_made = tf.gather(true_labels, indices)
@@ -153,7 +159,16 @@ class ModelEvaluator:
 
         accuracy = tf.reduce_mean(tf.cast(predictions_made == labels_made, tf.float32)).numpy()
         coverage = np.sum(decision) / len(scores)
-        delta = scores - self.optimal_threshold
-        mean_evidence_delta = np.mean(delta)
 
-        return accuracy, coverage, mean_evidence_delta
+        delta = scores - self.optimal_threshold
+        mean_evidence_all_delta = np.mean(delta)
+
+        below_threshold_mask = scores < self.optimal_threshold
+        remaining_scores = scores[below_threshold_mask] - self.optimal_threshold
+        mean_evidence_below_delta = np.mean(remaining_scores) if remaining_scores.size > 0 else 0.0
+
+        above_threshold_mask = scores > self.optimal_threshold
+        remaining_scores = scores[above_threshold_mask] - self.optimal_threshold
+        mean_evidence_above_delta = np.mean(remaining_scores) if remaining_scores.size > 0 else 0.0
+
+        return accuracy, coverage, mean_evidence_all_delta, mean_evidence_below_delta, mean_evidence_above_delta 
