@@ -24,6 +24,7 @@ Currently support:
 
 - Predictive Entropy
 - Differential Entropy
+- Total Alpha
 
 ## Attacks
 
@@ -39,3 +40,5 @@ Currently support:
 - Classification Datasets
 - - MNIST
 - - FashionMNIST
+- - CIFAR10
+- - CIFAR100
