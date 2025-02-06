@@ -1,21 +1,22 @@
-from datasets import DatasetManager
+from dataset import DatasetManager
 from utils import Datasets, Thresholds, Attacks
 import metrics
 import models
 
+import eagerpy as ep
 import foolbox
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
 
-class ModelEvaluator:
+class ClassificationEvaluator:
     def __init__(self, model, id_dataset_name: Datasets, ood_dataset_name: Datasets, threshold: Thresholds):
         self.dataset_manager = DatasetManager()
         self.id_dataset_name = id_dataset_name
         self.ood_dataset_name = ood_dataset_name
 
-        _, _, self.id_x_test, self.id_y_test = self.dataset_manager.get_dataset(self.id_dataset_name)
-        _, _, self.ood_x_test, self.ood_y_test = self.dataset_manager.get_dataset(self.ood_dataset_name)
+        _, _, self.id_x_test, self.id_y_test, self.id_x_val, self.id_y_val = self.dataset_manager.get_dataset(self.id_dataset_name)
+        _, _, self.ood_x_test, self.ood_y_test, self.ood_x_val, self.ood_y_val = self.dataset_manager.get_dataset(self.ood_dataset_name)
         self._check_dataset_shapes()
 
         self.model = model
@@ -36,20 +37,23 @@ class ModelEvaluator:
         if self.threshold == Thresholds.DIFF_ENTROPY and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel, models.PosteriorModel)):
                 raise RuntimeError("Differential Entropy threshold is only allowed for Evidential-based models.")
         
+        if self.threshold == Thresholds.TOTAL_ALPHA and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel, models.PosteriorModel)):
+                raise RuntimeError("Total Alpha threshold is only allowed for Evidential-based models.")
+        
         if self.threshold == Thresholds.PRED_ENTROPY:
             if isinstance(self.model, (models.EvidentialPlusModel, models.ConflictingEvidentialModel)): 
-                alpha_id = self.model.predict_probs(self.id_x_test, for_threshold=True)
-                alpha_ood = self.model.predict_probs(self.ood_x_test, for_threshold=True)
+                alpha_id = self.model.predict_probs(self.id_x_val, for_threshold=True)
+                alpha_ood = self.model.predict_probs(self.ood_x_val, for_threshold=True)
             else:
-                alpha_id = self.model.predict_probs(self.id_x_test)
-                alpha_ood = self.model.predict_probs(self.ood_x_test)
+                alpha_id = self.model.predict_probs(self.id_x_val)
+                alpha_ood = self.model.predict_probs(self.ood_x_val)
         else:
             if isinstance(self.model, (models.EvidentialPlusModel, models.ConflictingEvidentialModel)): 
-                alpha_id = self.model.predict(self.id_x_test, for_threshold=True)
-                alpha_ood = self.model.predict(self.ood_x_test, for_threshold=True)
+                alpha_id = self.model.predict(self.id_x_val, for_threshold=True)
+                alpha_ood = self.model.predict(self.ood_x_val, for_threshold=True)
             else:
-                alpha_id = self.model.predict(self.id_x_test, verbose=0)
-                alpha_ood = self.model.predict(self.ood_x_test, verbose=0)
+                alpha_id = self.model.predict(self.id_x_val, verbose=0)
+                alpha_ood = self.model.predict(self.ood_x_val, verbose=0)
         _, _, _, _, optimal_threshold = metrics.get_optimal_threshold(alpha_id, alpha_ood, metric=self.threshold)
 
         return optimal_threshold
@@ -91,12 +95,16 @@ class ModelEvaluator:
     # evaluate either dataset when attacked using foolbox
     def evaluate_attack(self, attack, dataset_type="ID", epsilons=1.5):
         if dataset_type == "ID":
-            images = tf.convert_to_tensor(self.id_x_test)
-            labels = tf.convert_to_tensor(np.argmax(self.id_y_test, axis=1))
+            images = ep.astensors(tf.convert_to_tensor(self.id_x_test))[0]
+            labels = ep.astensors(tf.convert_to_tensor(np.argmax(self.id_y_test, axis=1)))[0]
             true_labels = self.id_y_test
         elif dataset_type == "OOD":
-            images = tf.convert_to_tensor(self.ood_x_test)
-            labels = tf.convert_to_tensor(np.argmax(self.ood_y_test, axis=1))
+            images = ep.astensors(tf.convert_to_tensor(self.ood_x_test))[0]
+            if isinstance(self.model, (models.EvidentialPlusModel, models.ConflictingEvidentialModel)):
+                pseudo_labels = tf.argmax(self.model.predict(self.ood_x_test, for_threshold=True), axis=1)
+            else:
+                pseudo_labels = tf.argmax(self.model.predict(self.ood_x_test), axis=1)
+            labels = ep.astensor(tf.convert_to_tensor(pseudo_labels))
             true_labels = self.ood_y_test
         else:
             raise ValueError("dataset_type must be either 'ID' or 'OOD'.")
@@ -110,6 +118,7 @@ class ModelEvaluator:
 
         criterion = foolbox.criteria.Misclassification(labels)
         _, adversarial_images, _ = attack(self.fmodel, images, criterion, epsilons=epsilons)
+        adversarial_images = adversarial_images[0].numpy()
 
         if self.threshold == Thresholds.PRED_ENTROPY:
             adv_predictions = self.model.predict_probs(adversarial_images)
@@ -119,7 +128,7 @@ class ModelEvaluator:
         if not self.optimal_threshold: self.evaluate_data()
         _, adv_coverage, adv_mean_evidence_delta, adv_mean_evidence_below_delta, adv_mean_evidence_above_delta = self.get_results(adv_predictions, true_labels, f"Adversarial {dataset_type}")
 
-        perturbations = adversarial_images - images
+        perturbations = adversarial_images - images.numpy()
         perturbation_norms = tf.norm(tf.reshape(perturbations, (perturbations.shape[0], -1)), axis=1)
         avg_perturbation_norm = tf.reduce_mean(perturbation_norms).numpy()
 
@@ -142,6 +151,9 @@ class ModelEvaluator:
         elif self.threshold == Thresholds.PRED_ENTROPY:
             scores = -metrics.pred_entropy(predictions)
             decision = scores <= self.optimal_threshold 
+        elif self.threshold == Thresholds.TOTAL_ALPHA:
+            scores = metrics.total_alpha(predictions)
+            decision = scores >= self.optimal_threshold
 
         indices = tf.convert_to_tensor(np.where(decision)[0], dtype=tf.int32)
 

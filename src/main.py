@@ -1,7 +1,7 @@
-from datasets import DatasetManager
+from dataset import DatasetManager
 from utils import Datasets, Thresholds, Attacks
 import models
-from evaluator import ModelEvaluator
+from evaluator import ClassificationEvaluator
 
 import numpy as np
 import time
@@ -13,21 +13,22 @@ train_times, eval_times = [], []
 
 runs = 1
 
+# Classification loop
 for i in range(runs):
     print(f"Run: {i}")
 
     dataset_manager = DatasetManager()
-    x_train_mnist, y_train_mnist, _, _ = dataset_manager.get_dataset(Datasets.MNIST)
-    x_train_fashion_mnist, y_train_fashion_mnist, _, _ = dataset_manager.get_dataset(Datasets.FashionMNIST)
+    x_train_mnist, y_train_mnist, _, _, _, _ = dataset_manager.get_dataset(Datasets.MNIST)
+    x_train_fashion_mnist, y_train_fashion_mnist, _, _, _, _ = dataset_manager.get_dataset(Datasets.FashionMNIST)
 
-    model = models.EnD2Model(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.01)
+    model = models.EvidentialModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.001)
 
     start_train_time = time.time()
-    model.train(batch_size=128, epochs=1, verbose=1)
+    model.train(batch_size=64, epochs=1, verbose=1)
     end_train_time = time.time()
     train_times.append(end_train_time - start_train_time)
 
-    evaluator = ModelEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.DIFF_ENTROPY)
+    evaluator = ClassificationEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.DIFF_ENTROPY)
 
     start_eval_time = time.time()
     results = evaluator.evaluate_data()
@@ -44,7 +45,7 @@ for i in range(runs):
     ood_below_delta.append(results["OOD"]["mean_evidence_below_delta"])
     ood_above_delta.append(results["OOD"]["mean_evidence_above_delta"])
 
-    results = evaluator.evaluate_attack(Attacks.L2PGD, dataset_type="OOD", epsilons=1.0)
+    results = evaluator.evaluate_attack(Attacks.L2PGD, dataset_type="OOD", epsilons=[1.0])
 
     adv_coverage.append(results["ADV"]["coverage"])
     adv_delta.append(results["ADV"]["mean_evidence_delta"])

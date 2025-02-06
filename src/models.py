@@ -22,27 +22,50 @@ class StandardModel:
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
-        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(120, activation='tanh')(x)
-        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        x = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
         output = tf.keras.layers.Dense(self.num_classes, activation='softmax')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
-                                 verbose=verbose)
+                                 verbose=verbose,
+                                 callbacks=[lr_scheduler])
         return history
-    
+
     def predict(self, inputs, verbose=0):
         return self.model.predict(inputs, verbose=verbose)
-    
+
     def predict_probs(self, inputs):
         probabilities = self.model(inputs)
         return probabilities
@@ -71,25 +94,47 @@ class MCDropoutModel:
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
-        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
-        x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(120, activation='tanh')(x)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
         x = tf.keras.layers.Dropout(0.25)(x)
-        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
         output = tf.keras.layers.Dense(self.num_classes, activation='softmax')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
-                                 verbose=verbose)
+                                 verbose=verbose,
+                                 callbacks=[lr_scheduler])
         return history
-    
+
     def adaptive_mc_predict(self, inputs):
         num_samples = len(inputs)
         mc_preds_list = [[] for _ in range(num_samples)]
@@ -121,10 +166,10 @@ class MCDropoutModel:
         mean_fwd_passes = [len(mc_preds) for mc_preds in mc_preds_list]
         print("Mean number of forward passes per input:", np.mean(mean_fwd_passes))
         return np.array(mean_preds)
-    
+
     def predict(self, inputs, verbose=0):
         return self.adaptive_mc_predict(inputs)
-    
+
     def predict_probs(self, inputs):
         probabilities = self.adaptive_mc_predict(inputs)
         return probabilities
@@ -133,11 +178,11 @@ class MCDropoutModel:
         return self.model(inputs)
 
 class PosteriorModel:
-    def __init__(self, x_train, y_train, learning_rate=0.01):
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
-        self.kl_weight = 1.0
+        self.kl_weight = kl_weight
         self.learning_rate = learning_rate
 
         self.num_classes = y_train.shape[1]
@@ -153,48 +198,70 @@ class PosteriorModel:
             alpha = outputs + 1.0
             alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
             pred = alpha / alpha_sum
-            
+
             ce = tf.keras.losses.categorical_crossentropy(y_true, pred)
-            
+
             k = tf.cast(tf.shape(alpha)[1], tf.float32)
             sum_alpha = tf.reduce_sum(alpha, axis=1, keepdims=True)
 
             term1 = tf.math.lgamma(sum_alpha) - tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
             term2 = tf.reduce_sum(tf.math.lgamma(tf.ones_like(alpha)), axis=1, keepdims=True) - tf.math.lgamma(k)
             term3 = tf.reduce_sum((alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(sum_alpha)), axis=1, keepdims=True)
-            kl = term1 + term2 + term3        
-            kl = tf.reduce_mean(kl)
-            
+            kl = term1 + term2 + term3
+            kl = tf.reduce_sum(kl) / tf.cast(tf.shape(y_true)[0], tf.float32)
+
             return ce + self.kl_weight * kl
         return loss_fn
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
-        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(120, activation='tanh')(x)
-        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        x = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
         output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
-        class WeightCallback(tf.keras.callbacks.Callback):
+        class FisherWeightCallback(tf.keras.callbacks.Callback):
             def __init__(self, parent):
                 self.parent = parent
 
             def on_epoch_begin(self, epoch, logs=None):
                 self.parent.kl_weight = min(1.0, epoch / 10.0)
 
-        callback = WeightCallback(self)
+        fisher_callback = FisherWeightCallback(self)
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
                                  verbose=verbose,
-                                 callbacks=[callback])
+                                 callbacks=[fisher_callback, lr_scheduler])
         return history
 
     # get alphas
@@ -202,7 +269,7 @@ class PosteriorModel:
         evidence = self.model.predict(inputs, verbose=verbose)
         alpha = evidence + 1
         return alpha
-    
+
     def predict_probs(self, inputs):
         evidence = self.model(inputs)
         alpha = evidence + 1
@@ -219,11 +286,11 @@ class PosteriorModel:
         return probabilities
      
 class EvidentialModel:
-    def __init__(self, x_train, y_train, learning_rate=0.01):
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
-        self.kl_weight = 1.0
+        self.kl_weight = kl_weight
         self.learning_rate = learning_rate
 
         self.num_classes = y_train.shape[1]
@@ -233,6 +300,19 @@ class EvidentialModel:
         self.model.compile(optimizer=self.optimizer,
                            loss=self._evidential_loss(),
                            metrics=['accuracy'])
+
+    def dirichlet_kl_divergence(self, alpha):
+        alpha_shape = tf.shape(alpha)
+        K = tf.cast(alpha_shape[1], alpha.dtype)
+        alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        kl = tf.math.lgamma(alpha_sum) - tf.math.lgamma(K)
+        kl -= tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
+        kl += tf.reduce_sum(
+            (alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(alpha_sum)),
+            axis=1,
+            keepdims=True
+        )
+        return kl
 
     def _evidential_loss(self):
         def loss_fn(y_true, outputs):
@@ -245,37 +325,60 @@ class EvidentialModel:
             var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
             loss = err + var
 
-            kl_divergence = self.kl_weight * tf.reduce_sum((alpha - 1), axis=1)
-            return tf.reduce_mean(loss + kl_divergence)
+            kl_per_sample = self.dirichlet_kl_divergence(alpha)
+            kl_div = tf.squeeze(kl_per_sample, axis=1)
+            return tf.reduce_mean(loss + self.kl_weight * kl_div)
         return loss_fn
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
-        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(120, activation='tanh')(x)
-        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        x = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
         output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
-        class WeightCallback(tf.keras.callbacks.Callback):
+        class FisherWeightCallback(tf.keras.callbacks.Callback):
             def __init__(self, parent):
                 self.parent = parent
 
             def on_epoch_begin(self, epoch, logs=None):
                 self.parent.kl_weight = min(1.0, epoch / 10.0)
 
-        callback = WeightCallback(self)
+        fisher_callback = FisherWeightCallback(self)
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
                                  verbose=verbose,
-                                 callbacks=[callback])
+                                 callbacks=[fisher_callback, lr_scheduler])
         return history
 
     # get alphas
@@ -283,7 +386,7 @@ class EvidentialModel:
         evidence = self.model.predict(inputs, verbose=verbose)
         alpha = evidence + 1
         return alpha
-    
+
     def predict_probs(self, inputs):
         evidence = self.model(inputs)
         alpha = evidence + 1
@@ -300,13 +403,13 @@ class EvidentialModel:
         return probabilities
 
 class InformationEvidentialModel:
-    def __init__(self, x_train, y_train, learning_rate=0.01):
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
-        self.kl_weight = 1.0
+        self.kl_weight = kl_weight
         self.learning_rate = learning_rate
-        self.fisher_weight = 1.0
+        self.fisher_weight = 0.001
 
         self.num_classes = y_train.shape[1]
 
@@ -315,6 +418,19 @@ class InformationEvidentialModel:
         self.model.compile(optimizer=self.optimizer,
                            loss=self._fisher_evidential_loss(),
                            metrics=['accuracy'])
+
+    def dirichlet_kl_divergence(self, alpha):
+        alpha_shape = tf.shape(alpha)
+        K = tf.cast(alpha_shape[1], alpha.dtype)
+        alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        kl = tf.math.lgamma(alpha_sum) - tf.math.lgamma(K)
+        kl -= tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
+        kl += tf.reduce_sum(
+            (alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(alpha_sum)),
+            axis=1,
+            keepdims=True
+        )
+        return kl
 
     def _fisher_evidential_loss(self):
         def loss_fn(y_true, outputs):
@@ -325,26 +441,42 @@ class InformationEvidentialModel:
 
             err = tf.reduce_sum((y_true - m) ** 2, axis=1)
             var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
-            kl_divergence = self.kl_weight * tf.reduce_sum((alpha - 1), axis=1)
+
+            kl_per_sample = self.dirichlet_kl_divergence(alpha)
+            kl_div = tf.squeeze(kl_per_sample, axis=1)
 
             trigamma_alpha = tf.math.polygamma(1.0, alpha)
             trigamma_alpha0 = tf.math.polygamma(1.0, S)
             fisher_term = tf.reduce_sum(tf.math.log(trigamma_alpha), axis=1) + \
                       tf.math.log(1.0 - tf.reduce_sum(trigamma_alpha0 / trigamma_alpha, axis=1))
-            fisher_loss = self.fisher_weight * fisher_term
 
-            return tf.reduce_mean(err + var + kl_divergence + fisher_loss)  
+            return tf.reduce_mean(err + var + (self.kl_weight * kl_div) - self.fisher_weight * fisher_term)
         return loss_fn
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
-        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(120, activation='tanh')(x)
-        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        x = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
         output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
@@ -358,12 +490,19 @@ class InformationEvidentialModel:
                 self.parent.fisher_weight = min(1.0, epoch / 10.0)
 
         fisher_callback = FisherWeightCallback(self)
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
                                  verbose=verbose,
-                                 callbacks=[fisher_callback])
+                                 callbacks=[fisher_callback, lr_scheduler])
         return history
 
     # get alphas
@@ -371,7 +510,7 @@ class InformationEvidentialModel:
         evidence = self.model.predict(inputs, verbose=verbose)
         alpha = evidence + 1
         return alpha
-    
+
     def predict_probs(self, inputs):
         evidence = self.model(inputs)
         alpha = evidence + 1
@@ -388,13 +527,13 @@ class InformationEvidentialModel:
         return probabilities
     
 class SmoothedEvidentialModel:
-    def __init__(self, x_train, y_train, learning_rate=0.01):
+    def __init__(self, x_train, y_train, learning_rate=0.01, sigma=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
         self.kl_weight = 1.0
         self.learning_rate = learning_rate
-        self.sigma = 0.1
+        self.sigma = sigma
         self.num_samples = 50
 
         self.num_classes = y_train.shape[1]
@@ -404,6 +543,19 @@ class SmoothedEvidentialModel:
         self.model.compile(optimizer=self.optimizer,
                            loss=self._evidential_loss(),
                            metrics=['accuracy'])
+
+    def dirichlet_kl_divergence(self, alpha):
+        alpha_shape = tf.shape(alpha)
+        K = tf.cast(alpha_shape[1], alpha.dtype)
+        alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        kl = tf.math.lgamma(alpha_sum) - tf.math.lgamma(K)
+        kl -= tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
+        kl += tf.reduce_sum(
+            (alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(alpha_sum)),
+            axis=1,
+            keepdims=True
+        )
+        return kl
 
     def _evidential_loss(self):
         def loss_fn(y_true, outputs):
@@ -416,39 +568,62 @@ class SmoothedEvidentialModel:
             var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
             loss = err + var
 
-            kl_divergence = self.kl_weight * tf.reduce_sum((alpha - 1), axis=1)
-            return tf.reduce_mean(loss + kl_divergence)
+            kl_per_sample = self.dirichlet_kl_divergence(alpha)
+            kl_div = tf.squeeze(kl_per_sample, axis=1)
+            return tf.reduce_mean(loss + self.kl_weight * kl_div)
         return loss_fn
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
-        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(120, activation='tanh')(x)
-        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        x = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
         output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
-        class WeightCallback(tf.keras.callbacks.Callback):
+        class FisherWeightCallback(tf.keras.callbacks.Callback):
             def __init__(self, parent):
                 self.parent = parent
 
             def on_epoch_begin(self, epoch, logs=None):
                 self.parent.kl_weight = min(1.0, epoch / 10.0)
 
-        callback = WeightCallback(self)
+        fisher_callback = FisherWeightCallback(self)
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
                                  verbose=verbose,
-                                 callbacks=[callback])
+                                 callbacks=[fisher_callback, lr_scheduler])
         return history
-    
+
     def _generate_samples(self, inputs):
         """Generate perturbed samples from a Gaussian distribution."""
         batch_size, height, width, channels = inputs.shape
@@ -464,7 +639,7 @@ class SmoothedEvidentialModel:
         alpha = evidence + 1
         smoothed_alphas = np.median(alpha, axis=0)
         return smoothed_alphas
-    
+
     def predict_probs(self, inputs):
         evidence = self.model(inputs)
         alpha = evidence + 1
@@ -481,11 +656,11 @@ class SmoothedEvidentialModel:
         return probabilities
 
 class EvidentialPlusModel:
-    def __init__(self, x_train, y_train, learning_rate=0.01):
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
-        self.kl_weight = 1.0
+        self.kl_weight = kl_weight
         self.learning_rate = learning_rate
 
         self.num_classes = y_train.shape[1]
@@ -495,6 +670,19 @@ class EvidentialPlusModel:
         self.model.compile(optimizer=self.optimizer,
                            loss=self._evidential_loss(),
                            metrics=['accuracy'])
+
+    def dirichlet_kl_divergence(self, alpha):
+        alpha_shape = tf.shape(alpha)
+        K = tf.cast(alpha_shape[1], alpha.dtype)
+        alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        kl = tf.math.lgamma(alpha_sum) - tf.math.lgamma(K)
+        kl -= tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
+        kl += tf.reduce_sum(
+            (alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(alpha_sum)),
+            axis=1,
+            keepdims=True
+        )
+        return kl
 
     def _evidential_loss(self):
         def loss_fn(y_true, outputs):
@@ -507,37 +695,60 @@ class EvidentialPlusModel:
             var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
             loss = err + var
 
-            kl_divergence = self.kl_weight * tf.reduce_sum((alpha - 1), axis=1)
-            return tf.reduce_mean(loss + kl_divergence)
+            kl_per_sample = self.dirichlet_kl_divergence(alpha)
+            kl_div = tf.squeeze(kl_per_sample, axis=1)
+            return tf.reduce_mean(loss + self.kl_weight * kl_div)
         return loss_fn
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
-        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(120, activation='tanh')(x)
-        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        x = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
         output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
-        class WeightCallback(tf.keras.callbacks.Callback):
+        class FisherWeightCallback(tf.keras.callbacks.Callback):
             def __init__(self, parent):
                 self.parent = parent
 
             def on_epoch_begin(self, epoch, logs=None):
                 self.parent.kl_weight = min(1.0, epoch / 10.0)
 
-        callback = WeightCallback(self)
+        fisher_callback = FisherWeightCallback(self)
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
                                  verbose=verbose,
-                                 callbacks=[callback])
+                                 callbacks=[fisher_callback, lr_scheduler])
         return history
 
     def apply_random_transformation(self, inputs):
@@ -574,7 +785,7 @@ class EvidentialPlusModel:
         evidences = tf.reshape(evidences, [num_transforms, batch_size, self.num_classes])
         evidences = tf.transpose(evidences, [1, 2, 0])
 
-        mean_evidence = tf.reduce_mean(evidences, axis=-1) 
+        mean_evidence = tf.reduce_mean(evidences, axis=-1)
         return original_evidence, mean_evidence.numpy()
 
     def predict(self, inputs, num_transforms=5, verbose=0, for_threshold=False):
@@ -597,7 +808,7 @@ class EvidentialPlusModel:
             alpha = averaged_evidence + 1
             S = tf.reduce_sum(alpha, axis=1, keepdims=True)
             probabilities = alpha / S
-        return probabilities       
+        return probabilities
 
     def __call__(self, inputs):
         evidence = self.model(inputs)
@@ -607,11 +818,11 @@ class EvidentialPlusModel:
         return probabilities
     
 class ConflictingEvidentialModel:
-    def __init__(self, x_train, y_train, learning_rate=0.01):
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
         self.input_shape = x_train.shape[1:]
-        self.kl_weight = 1.0
+        self.kl_weight = kl_weight
         self.learning_rate = learning_rate
 
         self.num_classes = y_train.shape[1]
@@ -621,6 +832,19 @@ class ConflictingEvidentialModel:
         self.model.compile(optimizer=self.optimizer,
                            loss=self._evidential_loss(),
                            metrics=['accuracy'])
+
+    def dirichlet_kl_divergence(self, alpha):
+        alpha_shape = tf.shape(alpha)
+        K = tf.cast(alpha_shape[1], alpha.dtype)
+        alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        kl = tf.math.lgamma(alpha_sum) - tf.math.lgamma(K)
+        kl -= tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
+        kl += tf.reduce_sum(
+            (alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(alpha_sum)),
+            axis=1,
+            keepdims=True
+        )
+        return kl
 
     def _evidential_loss(self):
         def loss_fn(y_true, outputs):
@@ -633,37 +857,60 @@ class ConflictingEvidentialModel:
             var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
             loss = err + var
 
-            kl_divergence = self.kl_weight * tf.reduce_sum((alpha - 1), axis=1)
-            return tf.reduce_mean(loss + kl_divergence)
+            kl_per_sample = self.dirichlet_kl_divergence(alpha)
+            kl_div = tf.squeeze(kl_per_sample, axis=1)
+            return tf.reduce_mean(loss + self.kl_weight * kl_div)
         return loss_fn
 
     def _build_model(self):
         input = tf.keras.layers.Input(shape=self.input_shape)
-        x = tf.keras.layers.Conv2D(6, (5, 5), activation='tanh', padding='same')(input)
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
-        x = tf.keras.layers.Conv2D(16, (5, 5), activation='tanh')(x) 
-        x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(x)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
         x = tf.keras.layers.Flatten()(x)
-        x = tf.keras.layers.Dense(120, activation='tanh')(x)
-        x = tf.keras.layers.Dense(84, activation='tanh')(x)
+        x = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
         output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
         return tf.keras.models.Model(inputs=input, outputs=output)
 
     def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
-        class WeightCallback(tf.keras.callbacks.Callback):
+        class FisherWeightCallback(tf.keras.callbacks.Callback):
             def __init__(self, parent):
                 self.parent = parent
 
             def on_epoch_begin(self, epoch, logs=None):
                 self.parent.kl_weight = min(1.0, epoch / 10.0)
 
-        callback = WeightCallback(self)
+        fisher_callback = FisherWeightCallback(self)
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
         history = self.model.fit(self.x_train, self.y_train,
                                  batch_size=batch_size,
                                  epochs=epochs,
                                  validation_split=validation_split,
                                  verbose=verbose,
-                                 callbacks=[callback])
+                                 callbacks=[fisher_callback, lr_scheduler])
         return history
 
     def apply_random_transformation(self, inputs):
@@ -766,7 +1013,7 @@ class ConflictingEvidentialModel:
         else:
             alpha = averaged_evidence + 1
         return alpha
-    
+
     def predict_probs(self, inputs, num_transforms=5, verbose=0, for_threshold=False):
         original_evidence, averaged_evidence = self.predict_with_metamorphic_transforms(inputs, num_transforms)
         if for_threshold:
@@ -779,7 +1026,7 @@ class ConflictingEvidentialModel:
             alpha = averaged_evidence + 1
             S = tf.reduce_sum(alpha, axis=1, keepdims=True)
             probabilities = alpha / S
-        return probabilities       
+        return probabilities
 
     def __call__(self, inputs):
         evidence = self.model(inputs)

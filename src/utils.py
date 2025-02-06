@@ -7,6 +7,7 @@ class Datasets(Enum):
 class Thresholds(Enum):
     PRED_ENTROPY = "pred_entropy"
     DIFF_ENTROPY = "diff_entropy"
+    TOTAL_ALPHA = "total_alpha"
 
 class Attacks(Enum):
     L2PGD = "l2pgd"

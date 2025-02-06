@@ -10,7 +10,10 @@ def get_optimal_threshold(alpha_id, alpha_ood, metric: Thresholds = Thresholds.D
         ood_scores = diff_entropy(alpha_ood)
     elif metric == Thresholds.PRED_ENTROPY:
         id_scores = pred_entropy(alpha_id)
-        ood_scores = pred_entropy(alpha_ood)    
+        ood_scores = pred_entropy(alpha_ood) 
+    elif metric == Thresholds.TOTAL_ALPHA:
+        id_scores = total_alpha(alpha_id)
+        ood_scores = total_alpha(alpha_ood)
 
     corrects = np.concatenate([np.ones(len(alpha_id)), np.zeros(len(alpha_ood))], axis=0)
     scores = np.concatenate([id_scores, ood_scores], axis=0)
@@ -23,6 +26,9 @@ def get_optimal_threshold(alpha_id, alpha_ood, metric: Thresholds = Thresholds.D
     optimal_threshold = thresholds[optimal_idx]
     
     return auc_score, fpr, tpr, thresholds, optimal_threshold
+
+def total_alpha(alpha):
+    return np.sum(alpha, axis=1)
 
 def pred_entropy(probabilities):
     eps = 1e-6
