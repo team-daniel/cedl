@@ -42,3 +42,24 @@ Currently support:
 - - FashionMNIST
 - - CIFAR10
 - - CIFAR100
+- - DeepWeeds
+- - CitrusLeaves
+
+## Required Packages
+
+If you would like to run this code, please install these versions of the following packages:
+
+```python
+numpy==2.2.4
+eagerpy==0.30.0
+foolbox==3.3.4
+matplotlib==3.10.1
+tensorflow==2.19.0
+scipy==1.15.2
+tqdm==4.67.1
+scikit-learn==1.2.1
+opencv-python==4.11.0.86
+tensorflow-datasets==4.9.2
+datasets==3.1.0
+bs4==0.0.2
+```

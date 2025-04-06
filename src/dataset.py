@@ -4,6 +4,7 @@ from utils import Datasets
 from datasets import load_dataset
 import cv2
 from sklearn.model_selection import train_test_split
+import tensorflow_datasets as tfds
 
 class DatasetManager:
     def __init__(self):
@@ -12,6 +13,8 @@ class DatasetManager:
             Datasets.FashionMNIST.value: self._load_fashion_data(),
             Datasets.CIFAR10.value: self._load_cifar10_data(),
             Datasets.CIFAR100.value: self._load_cifar100_data(),
+            Datasets.DeepWeeds.value: self._load_deepweeds_data(),
+            Datasets.CitrusLeaves.value: self._load_citrus_leaves_data(),
         }
 
     @staticmethod
@@ -57,6 +60,32 @@ class DatasetManager:
         y_train = tf.keras.utils.to_categorical(y_train, 100)
         y_test = tf.keras.utils.to_categorical(y_test, 100)
         x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_test, y_test)
+        return x_train, y_train, x_test, y_test, x_val, y_val
+    
+    @staticmethod
+    def _load_deepweeds_data():
+        ds = tfds.load("deep_weeds", split="train", as_supervised=True)
+        ds_np = tfds.as_numpy(ds)
+        images, labels = zip(*list(ds_np))
+        x = np.array(images)
+        y = np.array(labels)
+        x = x.astype("float32") / 255.0
+        y = tf.keras.utils.to_categorical(y, 9)
+        x_train, x_temp, y_train, y_temp = train_test_split(x, y, test_size=0.4, stratify=y.argmax(axis=1))
+        x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_temp, y_temp, val_ratio=0.5)
+        return x_train, y_train, x_test, y_test, x_val, y_val
+
+    @staticmethod
+    def _load_citrus_leaves_data():
+        ds = tfds.load("citrus_leaves", split="train", as_supervised=True)
+        ds_np = tfds.as_numpy(ds)
+        images, labels = zip(*list(ds_np))
+        x = np.array(images)
+        y = np.array(labels)
+        x = x.astype("float32") / 255.0
+        y = tf.keras.utils.to_categorical(y, 4)
+        x_train, x_temp, y_train, y_temp = train_test_split(x, y, test_size=0.4, stratify=y.argmax(axis=1))
+        x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_temp, y_temp, val_ratio=0.5)
         return x_train, y_train, x_test, y_test, x_val, y_val
 
 
