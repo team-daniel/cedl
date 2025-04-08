@@ -34,21 +34,21 @@ class ClassificationEvaluator:
 
     # get the ID-OOD threshold
     def get_threshold(self):
-        if self.threshold == Thresholds.DIFF_ENTROPY and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel, models.PosteriorModel)):
+        if self.threshold == Thresholds.DIFF_ENTROPY and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.EvidentialPlusMetaModel, models.EvidentialPlusMcModel, models.ConflictingEvidentialMetaModel, models.ConflictingEvidentialMcModel, models.PosteriorModel)):
                 raise RuntimeError("Differential Entropy threshold is only allowed for Evidential-based models.")
         
-        if self.threshold == Thresholds.TOTAL_ALPHA and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.EvidentialPlusModel, models.ConflictingEvidentialModel, models.PosteriorModel)):
+        if self.threshold == Thresholds.TOTAL_ALPHA and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.EvidentialPlusMetaModel, models.EvidentialPlusMcModel, models.ConflictingEvidentialMetaModel, models.ConflictingEvidentialMcModel, models.PosteriorModel)):
                 raise RuntimeError("Total Alpha threshold is only allowed for Evidential-based models.")
         
         if self.threshold == Thresholds.PRED_ENTROPY:
-            if isinstance(self.model, (models.EvidentialPlusModel, models.ConflictingEvidentialModel)): 
+            if isinstance(self.model, (models.EvidentialPlusMetaModel, models.EvidentialPlusMcModel, models.ConflictingEvidentialMetaModel, models.ConflictingEvidentialMcModel)): 
                 alpha_id = self.model.predict_probs(self.id_x_val, for_threshold=True)
                 alpha_ood = self.model.predict_probs(self.ood_x_val, for_threshold=True)
             else:
                 alpha_id = self.model.predict_probs(self.id_x_val)
                 alpha_ood = self.model.predict_probs(self.ood_x_val)
         else:
-            if isinstance(self.model, (models.EvidentialPlusModel, models.ConflictingEvidentialModel)): 
+            if isinstance(self.model, (models.EvidentialPlusMetaModel, models.EvidentialPlusMcModel, models.ConflictingEvidentialMetaModel, models.ConflictingEvidentialMcModel)): 
                 alpha_id = self.model.predict(self.id_x_val, for_threshold=True)
                 alpha_ood = self.model.predict(self.ood_x_val, for_threshold=True)
             else:
@@ -100,7 +100,7 @@ class ClassificationEvaluator:
             true_labels = self.id_y_test
         elif dataset_type == "OOD":
             images = ep.astensors(tf.convert_to_tensor(self.ood_x_test))[0]
-            if isinstance(self.model, (models.EvidentialPlusModel, models.ConflictingEvidentialModel)):
+            if isinstance(self.model, (models.EvidentialPlusMetaModel, models.EvidentialPlusMcModel, models.ConflictingEvidentialMetaModel, models.ConflictingEvidentialMcModel)):
                 pseudo_labels = tf.argmax(self.model.predict(self.ood_x_test, for_threshold=True), axis=1)
             else:
                 pseudo_labels = tf.argmax(self.model.predict(self.ood_x_test), axis=1)

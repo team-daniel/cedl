@@ -655,7 +655,7 @@ class SmoothedEvidentialModel:
         probabilities = alpha / S
         return probabilities
 
-class EvidentialPlusModel:
+class EvidentialPlusMetaModel:
     def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
@@ -817,7 +817,144 @@ class EvidentialPlusModel:
         probabilities = alpha / S
         return probabilities
     
-class ConflictingEvidentialModel:
+class EvidentialPlusMcModel:
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.input_shape = x_train.shape[1:]
+        self.kl_weight = kl_weight
+        self.learning_rate = learning_rate
+
+        self.num_classes = y_train.shape[1]
+
+        self.model = self._build_model()
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.model.compile(optimizer=self.optimizer,
+                           loss=self._evidential_loss(),
+                           metrics=['accuracy'])
+
+    def dirichlet_kl_divergence(self, alpha):
+        alpha_shape = tf.shape(alpha)
+        K = tf.cast(alpha_shape[1], alpha.dtype)
+        alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        kl = tf.math.lgamma(alpha_sum) - tf.math.lgamma(K)
+        kl -= tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
+        kl += tf.reduce_sum(
+            (alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(alpha_sum)),
+            axis=1,
+            keepdims=True
+        )
+        return kl
+
+    def _evidential_loss(self):
+        def loss_fn(y_true, outputs):
+            evidence = outputs
+            alpha = evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            m = alpha / S
+
+            err = tf.reduce_sum((y_true - m) ** 2, axis=1)
+            var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
+            loss = err + var
+
+            kl_per_sample = self.dirichlet_kl_divergence(alpha)
+            kl_div = tf.squeeze(kl_per_sample, axis=1)
+            return tf.reduce_mean(loss + self.kl_weight * kl_div)
+        return loss_fn
+
+    def _build_model(self):
+        input = tf.keras.layers.Input(shape=self.input_shape)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
+        output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
+        return tf.keras.models.Model(inputs=input, outputs=output)
+
+    def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        class FisherWeightCallback(tf.keras.callbacks.Callback):
+            def __init__(self, parent):
+                self.parent = parent
+
+            def on_epoch_begin(self, epoch, logs=None):
+                self.parent.kl_weight = min(1.0, epoch / 10.0)
+
+        fisher_callback = FisherWeightCallback(self)
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
+        history = self.model.fit(self.x_train, self.y_train,
+                                 batch_size=batch_size,
+                                 epochs=epochs,
+                                 validation_split=validation_split,
+                                 verbose=verbose,
+                                 callbacks=[fisher_callback, lr_scheduler])
+        return history
+
+    def predict_with_mc_dropout(self, inputs, num_passes=5, delta=1.0, alpha=1.5):
+        original_evidence = self.model.predict(inputs, verbose=0)
+        batch_size = inputs.shape[0]
+        mc_evidences = []
+        for _ in range(num_passes):
+            ev = self.model(inputs, training=True)
+            mc_evidences.append(ev)
+        mc_evidences = tf.stack(mc_evidences, axis=0)
+        mc_evidences = tf.transpose(mc_evidences, [1, 2, 0])
+        adjusted_evidence = np.mean(mc_evidences.numpy(), axis=2)
+        return original_evidence, np.array(adjusted_evidence)
+
+    def predict(self, inputs, num_transforms=5, verbose=0, for_threshold=False):
+        original_evidence, averaged_evidence = self.predict_with_mc_dropout(inputs, num_transforms)
+        if for_threshold:
+            alpha = original_evidence + 1
+        else:
+            alpha = averaged_evidence + 1
+        return alpha
+
+    def predict_probs(self, inputs, num_transforms=5, verbose=0, for_threshold=False):
+        original_evidence, averaged_evidence = self.predict_with_mc_dropout(inputs, num_transforms)
+        if for_threshold:
+            original_evidence = tf.convert_to_tensor(original_evidence, dtype=tf.float32)
+            alpha = original_evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            probabilities = alpha / S
+        else:
+            averaged_evidence = tf.convert_to_tensor(averaged_evidence, dtype=tf.float32)
+            alpha = averaged_evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            probabilities = alpha / S
+        return probabilities
+
+    def __call__(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
+    
+class ConflictingEvidentialMetaModel:
     def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
         self.x_train = x_train
         self.y_train = y_train
@@ -1035,4 +1172,195 @@ class ConflictingEvidentialModel:
         probabilities = alpha / S
         return probabilities
     
+class ConflictingEvidentialMcModel:
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.input_shape = x_train.shape[1:]
+        self.kl_weight = kl_weight
+        self.learning_rate = learning_rate
 
+        self.num_classes = y_train.shape[1]
+
+        self.model = self._build_model()
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.model.compile(optimizer=self.optimizer,
+                           loss=self._evidential_loss(),
+                           metrics=['accuracy'])
+
+    def dirichlet_kl_divergence(self, alpha):
+        alpha_shape = tf.shape(alpha)
+        K = tf.cast(alpha_shape[1], alpha.dtype)
+        alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        kl = tf.math.lgamma(alpha_sum) - tf.math.lgamma(K)
+        kl -= tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
+        kl += tf.reduce_sum(
+            (alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(alpha_sum)),
+            axis=1,
+            keepdims=True
+        )
+        return kl
+
+    def _evidential_loss(self):
+        def loss_fn(y_true, outputs):
+            evidence = outputs
+            alpha = evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            m = alpha / S
+
+            err = tf.reduce_sum((y_true - m) ** 2, axis=1)
+            var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
+            loss = err + var
+
+            kl_per_sample = self.dirichlet_kl_divergence(alpha)
+            kl_div = tf.squeeze(kl_per_sample, axis=1)
+            return tf.reduce_mean(loss + self.kl_weight * kl_div)
+        return loss_fn
+
+    def _build_model(self):
+        input = tf.keras.layers.Input(shape=self.input_shape)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Flatten()(x)
+        x = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
+        output = tf.keras.layers.Dense(self.num_classes, activation='softplus')(x)
+        return tf.keras.models.Model(inputs=input, outputs=output)
+
+    def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        class FisherWeightCallback(tf.keras.callbacks.Callback):
+            def __init__(self, parent):
+                self.parent = parent
+
+            def on_epoch_begin(self, epoch, logs=None):
+                self.parent.kl_weight = min(1.0, epoch / 10.0)
+
+        fisher_callback = FisherWeightCallback(self)
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
+        history = self.model.fit(self.x_train, self.y_train,
+                                 batch_size=batch_size,
+                                 epochs=epochs,
+                                 validation_split=validation_split,
+                                 verbose=verbose,
+                                 callbacks=[fisher_callback, lr_scheduler])
+        return history
+
+    def calculate_kintra(self, evidence):
+        evidence = np.array(evidence)
+        n_classes, n_runs = evidence.shape
+        epsilon = 1e-8
+        intra_class_normalized_std = []
+        for i in range(n_classes):
+            class_evidence = evidence[i]
+            std_dev = np.std(class_evidence)
+            mean_evidence = np.mean(class_evidence)
+            normalized_std = std_dev / (mean_evidence + epsilon)
+            intra_class_normalized_std.append(normalized_std)
+        k_intra = np.mean(intra_class_normalized_std)
+        return k_intra
+
+    def calculate_krun_inter(self, evidence, alpha):
+        evidence = np.array(evidence)
+        n_classes, n_runs = evidence.shape
+        krun_inter_values = []
+        for run in range(n_runs):
+            pairwise_conflicts = []
+            e_values = evidence[:, run]
+            for i in range(n_classes):
+                for j in range(i + 1, n_classes):
+                    min_e = min(e_values[i], e_values[j])
+                    max_e = max(e_values[i], e_values[j])
+                    if max_e == 0:
+                        continue
+                    term = (min_e / max_e) * (min_e / np.sum(e_values)) * 2
+                    pairwise_conflicts.append(term)
+            if pairwise_conflicts:
+                sum_power_means = sum([conflict ** 2 for conflict in pairwise_conflicts]) ** (1 / 2)
+                scaled_sum_power_means = 1 - np.exp(-alpha * sum_power_means)
+                krun_inter_values.append(scaled_sum_power_means)
+            else:
+                krun_inter_values.append(0)
+        return np.mean(krun_inter_values)
+
+    def compute_K_total(self, K_inter, K_intra):
+        lambda_penalty = 0.5
+        penalty_grid = lambda_penalty * (K_inter - K_intra)**2
+        K_total = K_inter + K_intra - K_inter * K_intra - penalty_grid
+        K_total = np.clip(K_total, 0, 1)
+        return K_total
+
+    def process_evidence(self, evidence, alpha):
+        K_intra = self.calculate_kintra(evidence)
+        K_inter = self.calculate_krun_inter(evidence, alpha)
+        K_total = self.compute_K_total(K_inter, K_intra)
+        return K_total, K_inter, K_intra
+
+    def predict_with_mc_dropout(self, inputs, num_passes=5, delta=1.0, alpha=1.5):
+        original_evidence = self.model.predict(inputs, verbose=0)
+        batch_size = inputs.shape[0]
+        mc_evidences = []
+        for _ in range(num_passes):
+            ev = self.model(inputs, training=True)
+            mc_evidences.append(ev)
+        mc_evidences = tf.stack(mc_evidences, axis=0)
+        mc_evidences = tf.transpose(mc_evidences, [1, 2, 0])
+        adjusted_evidence = []
+        for sample_evidences in mc_evidences.numpy():
+            K_total, K_inter, K_intra = self.process_evidence(sample_evidences, alpha)
+            mean_evidence = np.mean(sample_evidences, axis=1)
+            scaling_factor = np.exp(-K_total * delta)
+            adjusted_ev = mean_evidence * scaling_factor
+            adjusted_evidence.append(adjusted_ev)
+        return original_evidence, np.array(adjusted_evidence)
+
+    def predict(self, inputs, num_transforms=5, verbose=0, for_threshold=False):
+        original_evidence, averaged_evidence = self.predict_with_mc_dropout(inputs, num_transforms)
+        if for_threshold:
+            alpha = original_evidence + 1
+        else:
+            alpha = averaged_evidence + 1
+        return alpha
+
+    def predict_probs(self, inputs, num_transforms=5, verbose=0, for_threshold=False):
+        original_evidence, averaged_evidence = self.predict_with_mc_dropout(inputs, num_transforms)
+        if for_threshold:
+            original_evidence = tf.convert_to_tensor(original_evidence, dtype=tf.float32)
+            alpha = original_evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            probabilities = alpha / S
+        else:
+            averaged_evidence = tf.convert_to_tensor(averaged_evidence, dtype=tf.float32)
+            alpha = averaged_evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            probabilities = alpha / S
+        return probabilities
+
+    def __call__(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities

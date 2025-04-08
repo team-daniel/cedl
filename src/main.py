@@ -23,7 +23,7 @@ for i in range(runs):
     x_train_fashion_mnist, y_train_fashion_mnist, _, _, _, _ = dataset_manager.get_dataset(Datasets.FashionMNIST)
 
     print(f"Training model...")
-    model = models.EvidentialModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.001)
+    model = models.ConflictingEvidentialMcModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.001)
 
     start_train_time = time.time()
     model.train(batch_size=64, epochs=250, verbose=0)
@@ -99,5 +99,5 @@ results_dict = {
     "eval_times": eval_times
 }
 
-with open("Results/mnist_fmnist_edl.pkl", "wb") as f:
+with open("Results/mnist_fmnist_cedlmc.pkl", "wb") as f:
     pickle.dump(results_dict, f)
