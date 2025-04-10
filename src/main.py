@@ -19,18 +19,18 @@ for i in range(runs):
     print(f"Run: {i}")
 
     dataset_manager = DatasetManager()
-    x_train_mnist, y_train_mnist, _, _, _, _ = dataset_manager.get_dataset(Datasets.MNIST)
-    x_train_fashion_mnist, y_train_fashion_mnist, _, _, _, _ = dataset_manager.get_dataset(Datasets.FashionMNIST)
+    x_train_id, y_train_id, _, _, _, _ = dataset_manager.get_dataset(Datasets.MNIST)
+    x_train_ood, y_train_ood, _, _, _, _ = dataset_manager.get_dataset(Datasets.KMNIST)
 
     print(f"Training model...")
-    model = models.ConflictingEvidentialMcModel(x_train=x_train_mnist, y_train=y_train_mnist, learning_rate=0.001)
+    model = models.SmoothedEvidentialModel(x_train=x_train_id, y_train=y_train_id, learning_rate=0.001)
 
     start_train_time = time.time()
     model.train(batch_size=64, epochs=250, verbose=0)
     end_train_time = time.time()
     train_times.append(end_train_time - start_train_time)
 
-    evaluator = ClassificationEvaluator(model, Datasets.MNIST, Datasets.FashionMNIST, threshold=Thresholds.DIFF_ENTROPY)
+    evaluator = ClassificationEvaluator(model, Datasets.MNIST, Datasets.KMNIST, threshold=Thresholds.DIFF_ENTROPY)
 
     print(f"Evaluation model...")
     start_eval_time = time.time()
@@ -99,5 +99,5 @@ results_dict = {
     "eval_times": eval_times
 }
 
-with open("Results/mnist_fmnist_cedlmc.pkl", "wb") as f:
+with open("Results/mnist_kmnist_sedl", "wb") as f:
     pickle.dump(results_dict, f)

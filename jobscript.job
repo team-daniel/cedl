@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=c-edl                        # Job name
 #SBATCH --partition=gpu                         # What partition the job should run on
-#SBATCH --time=0-3:00:00                        # Time limit (DD-HH:MM:SS)
+#SBATCH --time=0-4:00:00                        # Time limit (DD-HH:MM:SS)
 #SBATCH --nodes=1                               # Number of nodes
 #SBATCH --ntasks=1                              # Number of MPI tasks to request
 #SBATCH --cpus-per-task=32                      # Number of CPU cores per MPI task

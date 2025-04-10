@@ -4,6 +4,7 @@ import numpy as np
 import random
 import scipy
 from tqdm import tqdm
+import sklearn
 
 class StandardModel:
     def __init__(self, x_train, y_train, learning_rate=0.01):
@@ -654,6 +655,151 @@ class SmoothedEvidentialModel:
         S = tf.reduce_sum(alpha, axis=1, keepdims=True)
         probabilities = alpha / S
         return probabilities
+
+class DensityAwareEvidentialModel:
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.input_shape = x_train.shape[1:]
+        self.kl_weight = kl_weight
+        self.learning_rate = learning_rate
+
+        self.num_classes = y_train.shape[1]
+
+        self.model, self.feature_extractor = self._build_model()
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.model.compile(optimizer=self.optimizer,
+                           loss=self._evidential_loss(),
+                           metrics=['accuracy'])
+
+        self.density_estimator = None
+        self.density_min = None
+        self.density_max = None
+
+    def dirichlet_kl_divergence(self, alpha):
+        alpha_shape = tf.shape(alpha)
+        K = tf.cast(alpha_shape[1], alpha.dtype)
+        alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        kl = tf.math.lgamma(alpha_sum) - tf.math.lgamma(K)
+        kl -= tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
+        kl += tf.reduce_sum(
+            (alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(alpha_sum)),
+            axis=1,
+            keepdims=True
+        )
+        return kl
+
+    def _evidential_loss(self):
+        def loss_fn(y_true, outputs):
+            logits = outputs
+            evidence = tf.exp(logits)
+            alpha = evidence
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            m = alpha / S
+            err = tf.reduce_sum((y_true - m) ** 2, axis=1)
+            var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
+            loss = err + var
+            kl_per_sample = self.dirichlet_kl_divergence(alpha)
+            kl_div = tf.squeeze(kl_per_sample, axis=1)
+            return tf.reduce_mean(loss + self.kl_weight * kl_div)
+        return loss_fn
+
+    def _build_model(self):
+        input = tf.keras.layers.Input(shape=self.input_shape)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Flatten()(x)
+        features = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(features)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
+        logits = tf.keras.layers.Dense(self.num_classes, activation=None)(x)
+
+        model = tf.keras.models.Model(inputs=input, outputs=logits)
+        feature_extractor = tf.keras.models.Model(inputs=input, outputs=features)
+
+        return model, feature_extractor
+
+    def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        class FisherWeightCallback(tf.keras.callbacks.Callback):
+            def __init__(self, parent):
+                self.parent = parent
+
+            def on_epoch_begin(self, epoch, logs=None):
+                self.parent.kl_weight = min(1.0, epoch / 10.0)
+
+        fisher_callback = FisherWeightCallback(self)
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
+        history = self.model.fit(self.x_train, self.y_train,
+                                 batch_size=batch_size,
+                                 epochs=epochs,
+                                 validation_split=validation_split,
+                                 verbose=verbose,
+                                 callbacks=[fisher_callback, lr_scheduler])
+
+        self._fit_density_estimator()
+
+        return history
+
+    def _fit_density_estimator(self):
+        features = self.feature_extractor.predict(self.x_train, verbose=0)
+
+        self.density_estimator = sklearn.mixture.GaussianMixture(n_components=self.num_classes, covariance_type='full')
+        self.density_estimator.fit(features)
+
+        log_densities = self.density_estimator.score_samples(features)
+        self.density_min = np.min(log_densities)
+        self.density_max = np.max(log_densities)
+
+    def _compute_normalised_density(self, inputs):
+        features = self.feature_extractor.predict(inputs, verbose=0)
+        log_density = self.density_estimator.score_samples(features)
+
+        # normalise log density to [0, 1]
+        normalised = (log_density - self.density_min) / (self.density_max - self.density_min)
+        normalised = np.clip(normalised, 0.0, 1.0)
+        return normalised[:, np.newaxis]  # add axis for broadcasting
+
+    def predict(self, inputs, apply_density_scaling=True, verbose=0):
+        logits = self.model(inputs, training=False)
+
+        if apply_density_scaling:
+            s = self._compute_normalised_density(inputs)
+            logits = logits * tf.convert_to_tensor(s, dtype=logits.dtype)
+
+        evidence = tf.exp(logits)
+        alpha = evidence
+        return alpha
+
+    def predict_probs(self, inputs, apply_density_scaling=True):
+        alpha = self.predict(inputs, apply_density_scaling=apply_density_scaling)
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
+
+    def __call__(self, inputs):
+        return self.predict_probs(inputs)
 
 class EvidentialPlusMetaModel:
     def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):

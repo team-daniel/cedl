@@ -14,9 +14,12 @@ Currently support:
 - - Evidential Network
 - - Fisher-Information Evidential Network
 - - Smoothed Evidential Network
-- - Evidential++ Network
+- - Evidential++ Network (Meta)
 - - - Similar to the Conflicting Evidential Network but without the conflicting evidence reduction, only the metamorphic transformation.
-- - Conflicting Evidential Network
+- - Evidential++ Network (MC)
+- - - Similar to the Conflicting Evidential Network but without the conflicting evidence reduction, only the MC Dropout.
+- - Conflicting Evidential Network (Meta)
+- - Conflicting Evidential Network (MC)
 
 ## Threshold Metrics
 
@@ -38,8 +41,12 @@ Currently support:
 Currently support:
 
 - Classification Datasets
+- (28 x 28 images)
 - - MNIST
 - - FashionMNIST
+- - KMNIST
+- - EMNIST
+- (32 x 32 images)
 - - CIFAR10
 - - CIFAR100
 - - DeepWeeds

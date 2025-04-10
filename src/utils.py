@@ -3,10 +3,13 @@ from enum import Enum
 class Datasets(Enum):
     MNIST = "MNIST"
     FashionMNIST = "FashionMNIST"
+    KMNIST = "KMNIST"
+    EMNIST = "EMNIST"
     CIFAR10 = "CIFAR10"
     CIFAR100 = "CIFAR100"
     DeepWeeds = "DeepWeeds"
     CitrusLeaves = "CitrusLeaves"
+    SVHN = "SVHN"
 
 class Thresholds(Enum):
     PRED_ENTROPY = "pred_entropy"
