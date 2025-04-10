@@ -655,6 +655,145 @@ class SmoothedEvidentialModel:
         S = tf.reduce_sum(alpha, axis=1, keepdims=True)
         probabilities = alpha / S
         return probabilities
+    
+class HyperOpinionProjection(tf.keras.layers.Layer):
+    def __init__(self, weights):
+        super(HyperOpinionProjection, self).__init__()
+        self.Wp = tf.Variable(weights, trainable=False)
+
+    def call(self, inputs):
+        return tf.matmul(inputs, self.Wp)
+
+class HyperEvidentialModel:
+    def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
+        self.x_train = x_train
+        self.y_train = y_train
+        self.input_shape = x_train.shape[1:]
+        self.kl_weight = kl_weight
+        self.learning_rate = learning_rate
+
+        self.num_classes = y_train.shape[1]
+
+        self.model = self._build_model()
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.model.compile(optimizer=self.optimizer,
+                           loss=self._evidential_loss(),
+                           metrics=['accuracy'])
+
+    def dirichlet_kl_divergence(self, alpha):
+        alpha_shape = tf.shape(alpha)
+        K = tf.cast(alpha_shape[1], alpha.dtype)
+        alpha_sum = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        kl = tf.math.lgamma(alpha_sum) - tf.math.lgamma(K)
+        kl -= tf.reduce_sum(tf.math.lgamma(alpha), axis=1, keepdims=True)
+        kl += tf.reduce_sum(
+            (alpha - 1.0) * (tf.math.digamma(alpha) - tf.math.digamma(alpha_sum)),
+            axis=1,
+            keepdims=True
+        )
+        return kl
+
+    def _evidential_loss(self):
+        def loss_fn(y_true, outputs):
+            evidence = outputs
+            alpha = evidence + 1
+            S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+            m = alpha / S
+
+            err = tf.reduce_sum((y_true - m) ** 2, axis=1)
+            var = tf.reduce_sum(m * (1 - m) / (S + 1), axis=1)
+            loss = err + var
+
+            kl_per_sample = self.dirichlet_kl_divergence(alpha)
+            kl_div = tf.squeeze(kl_per_sample, axis=1)
+            return tf.reduce_mean(loss + self.kl_weight * kl_div)
+        return loss_fn
+
+    def _build_model(self):
+        input = tf.keras.layers.Input(shape=self.input_shape)
+
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(input)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(32, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = tf.keras.layers.Dropout(0.25)(x)
+
+        x = tf.keras.layers.Flatten()(x)
+        features = tf.keras.layers.Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(features)
+        x = tf.keras.layers.Dropout(0.25)(x)
+        x = tf.keras.layers.Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.0001))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+
+        logits = tf.keras.layers.Dense(self.num_classes, activation=None)(x)
+
+        self.logits_model = tf.keras.models.Model(inputs=input, outputs=logits)
+        self.features_model = tf.keras.models.Model(inputs=input, outputs=features)
+        return self._hyper_opinion_projection(self.logits_model)
+
+    def _hyper_opinion_projection(self, logits_model):
+        input_layer = logits_model.input
+        logits = logits_model.output
+        num_classes = logits.shape[-1]
+        WS = tf.eye(num_classes)
+        sum_WS = tf.reduce_sum(WS, axis=0, keepdims=True) + 1e-8
+        Wp = WS / sum_WS
+        projected_logits = HyperOpinionProjection(Wp)(logits)
+        projected_evidence = tf.keras.layers.Activation('softplus')(projected_logits)
+        return tf.keras.models.Model(inputs=input_layer, outputs=projected_evidence)
+
+
+    def train(self, batch_size=128, epochs=100, validation_split=0.2, verbose=0):
+        class FisherWeightCallback(tf.keras.callbacks.Callback):
+            def __init__(self, parent):
+                self.parent = parent
+
+            def on_epoch_begin(self, epoch, logs=None):
+                self.parent.kl_weight = min(1.0, epoch / 10.0)
+
+        fisher_callback = FisherWeightCallback(self)
+        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.5,
+            patience=5,
+            min_lr=1e-8,
+            verbose=verbose
+        )
+        history = self.model.fit(self.x_train, self.y_train,
+                                 batch_size=batch_size,
+                                 epochs=epochs,
+                                 validation_split=validation_split,
+                                 verbose=verbose,
+                                 callbacks=[fisher_callback, lr_scheduler])
+        return history
+
+    # get alphas
+    def predict(self, inputs, verbose=0):
+        evidence = self.model.predict(inputs, verbose=verbose)
+        alpha = evidence + 1
+        return alpha
+
+    def predict_probs(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
+
+    def __call__(self, inputs):
+        evidence = self.model(inputs)
+        alpha = evidence + 1
+        S = tf.reduce_sum(alpha, axis=1, keepdims=True)
+        probabilities = alpha / S
+        return probabilities
 
 class DensityAwareEvidentialModel:
     def __init__(self, x_train, y_train, kl_weight=0.0001, learning_rate=0.01):
