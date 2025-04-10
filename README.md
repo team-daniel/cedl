@@ -14,6 +14,7 @@ Currently support:
 - - Evidential Network
 - - Fisher-Information Evidential Network
 - - Smoothed Evidential Network
+- - Density Aware Evidential Network
 - - Evidential++ Network (Meta)
 - - - Similar to the Conflicting Evidential Network but without the conflicting evidence reduction, only the metamorphic transformation.
 - - Evidential++ Network (MC)
