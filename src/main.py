@@ -23,7 +23,7 @@ for i in range(runs):
     x_train_ood, y_train_ood, _, _, _, _ = dataset_manager.get_dataset(Datasets.KMNIST)
 
     print(f"Training model...")
-    model = models.SmoothedEvidentialModel(x_train=x_train_id, y_train=y_train_id, learning_rate=0.001)
+    model = models.RelaxedEvidentialModel(x_train=x_train_id, y_train=y_train_id, learning_rate=0.001)
 
     start_train_time = time.time()
     model.train(batch_size=64, epochs=250, verbose=0)
@@ -99,5 +99,5 @@ results_dict = {
     "eval_times": eval_times
 }
 
-with open("Results/mnist_kmnist_sedl", "wb") as f:
+with open("Results/mnist_kmnist_redl", "wb") as f:
     pickle.dump(results_dict, f)

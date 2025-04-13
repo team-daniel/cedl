@@ -34,10 +34,10 @@ class ClassificationEvaluator:
 
     # get the ID-OOD threshold
     def get_threshold(self):
-        if self.threshold == Thresholds.DIFF_ENTROPY and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.HyperEvidentialModel, models.DensityAwareEvidentialModel, models.EvidentialPlusMetaModel, models.EvidentialPlusMcModel, models.ConflictingEvidentialMetaModel, models.ConflictingEvidentialMcModel, models.PosteriorModel)):
+        if self.threshold == Thresholds.DIFF_ENTROPY and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.HyperEvidentialModel, models.RelaxedEvidentialModel, models.DensityAwareEvidentialModel, models.EvidentialPlusMetaModel, models.EvidentialPlusMcModel, models.ConflictingEvidentialMetaModel, models.ConflictingEvidentialMcModel, models.PosteriorModel)):
                 raise RuntimeError("Differential Entropy threshold is only allowed for Evidential-based models.")
         
-        if self.threshold == Thresholds.TOTAL_ALPHA and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.HyperEvidentialModel, models.DensityAwareEvidentialModel, models.EvidentialPlusMetaModel, models.EvidentialPlusMcModel, models.ConflictingEvidentialMetaModel, models.ConflictingEvidentialMcModel, models.PosteriorModel)):
+        if self.threshold == Thresholds.TOTAL_ALPHA and not isinstance(self.model, (models.EvidentialModel, models.SmoothedEvidentialModel, models.InformationEvidentialModel, models.HyperEvidentialModel, models.RelaxedEvidentialModel, models.DensityAwareEvidentialModel, models.EvidentialPlusMetaModel, models.EvidentialPlusMcModel, models.ConflictingEvidentialMetaModel, models.ConflictingEvidentialMcModel, models.PosteriorModel)):
                 raise RuntimeError("Total Alpha threshold is only allowed for Evidential-based models.")
         
         if self.threshold == Thresholds.PRED_ENTROPY:
