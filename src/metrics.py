@@ -21,8 +21,8 @@ def get_optimal_threshold(alpha_id, alpha_ood, metric: Thresholds = Thresholds.D
     fpr, tpr, thresholds = sklearn.metrics.roc_curve(corrects, scores)
     auc_score = sklearn.metrics.auc(fpr, tpr)
     
-    youden_index = tpr - fpr
-    optimal_idx = np.argmax(youden_index)
+    index = tpr - fpr
+    optimal_idx = np.argmax(index)
     optimal_threshold = thresholds[optimal_idx]
     
     return auc_score, fpr, tpr, thresholds, optimal_threshold

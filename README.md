@@ -67,7 +67,7 @@ matplotlib==3.10.1
 tensorflow==2.15.0
 scipy==1.15.2
 tqdm==4.67.1
-scikit-learn==1.2.1
+scikit-learn==1.6.1
 opencv-python==4.11.0.86
 tensorflow-datasets==4.9.8
 datasets==3.1.0

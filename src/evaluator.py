@@ -8,6 +8,7 @@ import foolbox
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
+import gc
 
 class ClassificationEvaluator:
     def __init__(self, model, id_dataset_name: Datasets, ood_dataset_name: Datasets, threshold: Thresholds):
@@ -141,6 +142,11 @@ class ClassificationEvaluator:
             },
             "avg_perturbation": avg_perturbation_norm
         }
+
+        del images, labels, adversarial_images, adv_predictions, criterion
+        tf.keras.backend.clear_session()
+        gc.collect()
+
         return results
 
     # get results based off predicitons

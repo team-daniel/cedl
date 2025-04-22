@@ -4,6 +4,7 @@ import numpy as np
 import random
 import scipy
 from tqdm import tqdm
+import gc
 import sklearn
 
 class StandardModel:
@@ -630,15 +631,20 @@ class SmoothedEvidentialModel:
         batch_size, height, width, channels = inputs.shape
         noise = np.random.normal(loc=0.0, scale=self.sigma, size=(self.num_samples, batch_size, height, width, channels))
         perturbed_samples = inputs[None, :, :, :, :] + noise
+        del noise
         perturbed_samples = np.reshape(perturbed_samples, (-1, height, width, channels))
         return perturbed_samples
 
     def predict(self, inputs, verbose=0):
         perturbed_samples = self._generate_samples(inputs)
         evidence = self.model.predict(perturbed_samples, verbose=0)
+        del perturbed_samples 
         evidence = np.reshape(evidence, (self.num_samples, -1, self.num_classes))
         alpha = evidence + 1
+        del evidence
         smoothed_alphas = np.median(alpha, axis=0)
+        del alpha
+        gc.collect()
         return smoothed_alphas
 
     def predict_probs(self, inputs):

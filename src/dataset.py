@@ -141,7 +141,8 @@ class DatasetManager:
         y_test = np.array(y_test)
         y_train = tf.keras.utils.to_categorical(y_train, 10)
         y_test = tf.keras.utils.to_categorical(y_test, 10)
-        x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_test, y_test)
+        x_irrelevant, y_irrelevant, x_remaining, y_remaining = DatasetManager._split_test_val(x_test, y_test, val_ratio=16032/26032)
+        x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_remaining, y_remaining, val_ratio=5200/16032)
         return x_train, y_train, x_test, y_test, x_val, y_val
 
     def get_dataset(self, name: Datasets):
