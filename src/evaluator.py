@@ -112,8 +112,9 @@ class ClassificationEvaluator:
 
         if attack == Attacks.L2PGD:
             attack = foolbox.attacks.L2PGD()
-        elif attack == Attacks.LinfPGD:
-            attack = foolbox.attacks.LinfPGD()
+        elif attack == Attacks.FGSM:
+            attack = foolbox.attacks.FGSM()
+
         else:
             raise ValueError("Unsupported attack.")
 
@@ -160,13 +161,23 @@ class ClassificationEvaluator:
         elif self.threshold == Thresholds.TOTAL_ALPHA:
             scores = metrics.total_alpha(predictions)
             decision = scores >= self.optimal_threshold
+        elif self.threshold == Thresholds.MUTUAL_INFO:
+            scores = metrics.mutual_info(predictions)
+            decision = scores >= self.optimal_threshold
 
         indices = tf.convert_to_tensor(np.where(decision)[0], dtype=tf.int32)
 
         if len(indices) == 0:
             print(f"No predictions made for {dataset_type}. Coverage: 0.00%")
             mean_evidence_delta = np.mean(scores - self.optimal_threshold)
-            return 0.0, 0.0, mean_evidence_delta
+            below_threshold_mask = scores < self.optimal_threshold
+            remaining_scores = scores[below_threshold_mask] - self.optimal_threshold
+            mean_evidence_below_delta = np.mean(remaining_scores) if remaining_scores.size > 0 else 0.0
+
+            above_threshold_mask = scores > self.optimal_threshold
+            remaining_scores = scores[above_threshold_mask] - self.optimal_threshold
+            mean_evidence_above_delta = np.mean(remaining_scores) if remaining_scores.size > 0 else 0.0
+            return 0.0, 0.0, mean_evidence_delta, mean_evidence_below_delta, mean_evidence_above_delta
         
         predictions_made = tf.gather(predictions, indices)
         labels_made = tf.gather(true_labels, indices)

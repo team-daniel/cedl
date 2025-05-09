@@ -14,6 +14,9 @@ def get_optimal_threshold(alpha_id, alpha_ood, metric: Thresholds = Thresholds.D
     elif metric == Thresholds.TOTAL_ALPHA:
         id_scores = total_alpha(alpha_id)
         ood_scores = total_alpha(alpha_ood)
+    elif metric == Thresholds.MUTUAL_INFO:
+        id_scores = mutual_info(alpha_id)
+        ood_scores = mutual_info(alpha_ood)
 
     corrects = np.concatenate([np.ones(len(alpha_id)), np.zeros(len(alpha_ood))], axis=0)
     scores = np.concatenate([id_scores, ood_scores], axis=0)
@@ -26,6 +29,18 @@ def get_optimal_threshold(alpha_id, alpha_ood, metric: Thresholds = Thresholds.D
     optimal_threshold = thresholds[optimal_idx]
     
     return auc_score, fpr, tpr, thresholds, optimal_threshold
+
+def mutual_info(alpha):
+    eps = 1e-6
+    alpha = np.asarray(alpha, dtype=np.float64) + eps
+    alpha0 = np.sum(alpha, axis=1, keepdims=True)
+    probs = alpha / alpha0 
+    total_uncertainty = -np.sum(probs * np.log(probs + eps), axis=1)
+    digamma_alpha = scipy.special.digamma(alpha + 1.0)
+    digamma_alpha0 = scipy.special.digamma(alpha0 + 1.0)
+    exp_data_uncertainty = -np.sum(probs * (digamma_alpha - digamma_alpha0), axis=1)
+    mi = total_uncertainty - exp_data_uncertainty
+    return (-mi).squeeze()   
 
 def total_alpha(alpha):
     return np.sum(alpha, axis=1)

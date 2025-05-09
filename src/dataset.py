@@ -4,20 +4,20 @@ from utils import Datasets
 from datasets import load_dataset
 import cv2
 from sklearn.model_selection import train_test_split
-import tensorflow_datasets as tfds
+#import tensorflow_datasets as tfds
 
 class DatasetManager:
     def __init__(self):
         self.datasets = {
             Datasets.MNIST.value: self._load_mnist_data(),
             Datasets.FashionMNIST.value: self._load_fashion_data(),
-            Datasets.KMNIST.value: self._load_kmnist_data(),
-            Datasets.EMNIST.value: self._load_emnist_data(),
-            Datasets.CIFAR10.value: self._load_cifar10_data(),
-            Datasets.CIFAR100.value: self._load_cifar100_data(),
-            Datasets.DeepWeeds.value: self._load_deepweeds_data(),
-            Datasets.CitrusLeaves.value: self._load_citrus_leaves_data(),
-            Datasets.SVHN.value: self._load_svhn_data(),
+            #Datasets.KMNIST.value: self._load_kmnist_data(),
+            #Datasets.EMNIST.value: self._load_emnist_data(),
+            #Datasets.CIFAR10.value: self._load_cifar10_data(),
+            #Datasets.CIFAR100.value: self._load_cifar100_data(),
+            #Datasets.DeepWeeds.value: self._load_deepweeds_data(),
+            #Datasets.CitrusLeaves.value: self._load_citrus_leaves_data(),
+            #Datasets.SVHN.value: self._load_svhn_data(),
         }
 
     @staticmethod

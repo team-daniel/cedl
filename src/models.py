@@ -1515,7 +1515,7 @@ class ConflictingEvidentialMetaModel:
         return np.mean(krun_inter_values)
 
     def compute_K_total(self, K_inter, K_intra):
-        lambda_penalty = 0.5
+        lambda_penalty = 0.5 # default is 0.5
         penalty_grid = lambda_penalty * (K_inter - K_intra)**2
         K_total = K_inter + K_intra - K_inter * K_intra - penalty_grid
         K_total = np.clip(K_total, 0, 1)
@@ -1527,7 +1527,7 @@ class ConflictingEvidentialMetaModel:
         K_total = self.compute_K_total(K_inter, K_intra)
         return K_total, K_inter, K_intra
 
-    def predict_with_metamorphic_transforms(self, inputs, num_transforms=5, delta=1.0, alpha=1.5):
+    def predict_with_metamorphic_transforms(self, inputs, num_transforms=5, delta=1.0, alpha=0.5): #default is 1.0, 1.5
         original_evidence = self.model.predict(inputs, verbose=0)
         transformed_inputs = self.apply_metamorphic_transformations(inputs, num_transforms)
         batch_size = inputs.shape[0]
@@ -1708,7 +1708,7 @@ class ConflictingEvidentialMcModel:
         return np.mean(krun_inter_values)
 
     def compute_K_total(self, K_inter, K_intra):
-        lambda_penalty = 0.5
+        lambda_penalty = 1.0 #default 0.5
         penalty_grid = lambda_penalty * (K_inter - K_intra)**2
         K_total = K_inter + K_intra - K_inter * K_intra - penalty_grid
         K_total = np.clip(K_total, 0, 1)
@@ -1720,7 +1720,7 @@ class ConflictingEvidentialMcModel:
         K_total = self.compute_K_total(K_inter, K_intra)
         return K_total, K_inter, K_intra
 
-    def predict_with_mc_dropout(self, inputs, num_passes=5, delta=1.0, alpha=1.5):
+    def predict_with_mc_dropout(self, inputs, num_passes=5, delta=1.0, alpha=1.5): #default 1.0, 1.5
         original_evidence = self.model.predict(inputs, verbose=0)
         batch_size = inputs.shape[0]
         mc_evidences = []

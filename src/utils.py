@@ -15,7 +15,8 @@ class Thresholds(Enum):
     PRED_ENTROPY = "pred_entropy"
     DIFF_ENTROPY = "diff_entropy"
     TOTAL_ALPHA = "total_alpha"
+    MUTUAL_INFO = "mutual_info"
 
 class Attacks(Enum):
     L2PGD = "l2pgd"
-    LinfPGD = "linfpgd"
+    FGSM = "fgsm"
