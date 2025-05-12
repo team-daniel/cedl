@@ -8,7 +8,7 @@ class Datasets(Enum):
     CIFAR10 = "CIFAR10"
     CIFAR100 = "CIFAR100"
     DeepWeeds = "DeepWeeds"
-    FLOWERS = "FLOWWERS"
+    FLOWERS = "FLOWERS"
     SVHN = "SVHN"
 
 class Thresholds(Enum):
