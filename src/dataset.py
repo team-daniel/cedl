@@ -109,7 +109,7 @@ class DatasetManager:
         x = tf.image.resize(x, (64, 64)).numpy()
         x = x.astype("float32") / 255.0
         y = tf.keras.utils.to_categorical(y, 9)
-        x_train, x_temp, y_train, y_temp = model_selection.train_test_split(x, y, test_size=0.4, stratify=y.argmax(axis=1))
+        x_train, x_temp, y_train, y_temp = train_test_split(x, y, test_size=0.4, stratify=y.argmax(axis=1))
         x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_temp, y_temp, val_ratio=0.5)
         return x_train, y_train, x_test, y_test, x_val, y_val
 
@@ -127,7 +127,7 @@ class DatasetManager:
         ).map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
         images, labels = next(iter(tfds.as_numpy(ds.batch(8192))))
         y_onehot = tf.keras.utils.to_categorical(labels, num_classes=102)
-        x_train, x_temp, y_train, y_temp = model_selection.train_test_split(images, y_onehot, test_size=0.40, stratify=labels)
+        x_train, x_temp, y_train, y_temp = train_test_split(images, y_onehot, test_size=0.40, stratify=labels)
         x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_temp, y_temp, val_ratio=0.5)
         def augment_single(image):
             image = tf.image.random_flip_left_right(image)

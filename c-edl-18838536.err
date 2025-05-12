@@ -1,0 +1,18 @@
+2025-05-12 19:20:11.445410: E external/local_xla/xla/stream_executor/cuda/cuda_dnn.cc:9261] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+2025-05-12 19:20:11.446201: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:607] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+2025-05-12 19:20:11.473460: E external/local_xla/xla/stream_executor/cuda/cuda_blas.cc:1515] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+2025-05-12 19:20:11.530659: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2025-05-12 19:20:12.651271: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+2025-05-12 19:20:17.627668: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1929] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 43694 MB memory:  -> device: 0, name: NVIDIA A40, pci bus id: 0000:e2:00.0, compute capability: 8.6
+Traceback (most recent call last):
+  File "/mnt/scratch/users/dab567/cedl/src/main.py", line 23, in <module>
+    dataset_manager = DatasetManager()
+                      ^^^^^^^^^^^^^^^^
+  File "/mnt/scratch/users/dab567/cedl/src/dataset.py", line 18, in __init__
+    Datasets.DeepWeeds.value: self._load_deepweeds_data(),
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/scratch/users/dab567/cedl/src/dataset.py", line 112, in _load_deepweeds_data
+    x_train, x_temp, y_train, y_temp = model_selection.train_test_split(x, y, test_size=0.4, stratify=y.argmax(axis=1))
+                                       ^^^^^^^^^^^^^^^
+NameError: name 'model_selection' is not defined

@@ -1154,8 +1154,7 @@ class EvidentialPlusMetaModel:
         return history
 
     def apply_random_transformation(self, inputs):
-        #transformations = ['rotate', 'shift', 'add_noise']
-        transformations = ['add_noise']
+        transformations = ['rotate', 'shift', 'add_noise']
         transform = random.choice(transformations)
         inputs_transformed = inputs
 
@@ -1166,7 +1165,7 @@ class EvidentialPlusMetaModel:
             shift_val = random.randint(-2, 2) #2
             inputs_transformed = np.roll(inputs, shift=shift_val, axis=0)
         elif transform == 'add_noise':
-            noise = np.random.normal(0, 0.02, inputs.shape) #0.01
+            noise = np.random.normal(0, 0.01, inputs.shape) #0.01
             inputs_transformed = inputs + noise
 
         inputs_transformed = np.clip(inputs_transformed, 0, 1)
