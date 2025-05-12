@@ -1154,18 +1154,19 @@ class EvidentialPlusMetaModel:
         return history
 
     def apply_random_transformation(self, inputs):
-        transformations = ['rotate', 'shift', 'add_noise']
+        #transformations = ['rotate', 'shift', 'add_noise']
+        transformations = ['add_noise']
         transform = random.choice(transformations)
         inputs_transformed = inputs
 
         if transform == 'rotate':
-            angle = random.uniform(-15, 15)
+            angle = random.uniform(-15, 15) #15
             inputs_transformed = scipy.ndimage.rotate(inputs, angle, reshape=False, mode='nearest')
         elif transform == 'shift':
-            shift_val = random.randint(-2, 2)
+            shift_val = random.randint(-2, 2) #2
             inputs_transformed = np.roll(inputs, shift=shift_val, axis=0)
         elif transform == 'add_noise':
-            noise = np.random.normal(0, 0.01, inputs.shape)
+            noise = np.random.normal(0, 0.02, inputs.shape) #0.01
             inputs_transformed = inputs + noise
 
         inputs_transformed = np.clip(inputs_transformed, 0, 1)
@@ -1527,7 +1528,7 @@ class ConflictingEvidentialMetaModel:
         K_total = self.compute_K_total(K_inter, K_intra)
         return K_total, K_inter, K_intra
 
-    def predict_with_metamorphic_transforms(self, inputs, num_transforms=5, delta=1.0, alpha=0.5): #default is 1.0, 1.5
+    def predict_with_metamorphic_transforms(self, inputs, num_transforms=5, delta=1.0, alpha=1.5): #default is 1.0, 1.5
         original_evidence = self.model.predict(inputs, verbose=0)
         transformed_inputs = self.apply_metamorphic_transformations(inputs, num_transforms)
         batch_size = inputs.shape[0]
@@ -1708,7 +1709,7 @@ class ConflictingEvidentialMcModel:
         return np.mean(krun_inter_values)
 
     def compute_K_total(self, K_inter, K_intra):
-        lambda_penalty = 1.0 #default 0.5
+        lambda_penalty = 0.5 #default 0.5
         penalty_grid = lambda_penalty * (K_inter - K_intra)**2
         K_total = K_inter + K_intra - K_inter * K_intra - penalty_grid
         K_total = np.clip(K_total, 0, 1)

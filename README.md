@@ -28,9 +28,9 @@ Currently support:
 
 Currently support:
 
-- Predictive Entropy
 - Differential Entropy
 - Total Alpha
+- Mutual Information
 
 ## Attacks
 
@@ -38,6 +38,7 @@ Currently support:
 
 - L2PGD
 - LinfPGD
+- Salt&Pepper
 
 ## Datasets
 
@@ -52,8 +53,9 @@ Currently support:
 - (32 x 32 images)
 - - CIFAR10
 - - CIFAR100
+- (64 x 64 images)
 - - DeepWeeds
-- - CitrusLeaves
+- - OxfordFlowers
 
 ## Required Packages
 

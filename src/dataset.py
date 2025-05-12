@@ -4,20 +4,20 @@ from utils import Datasets
 from datasets import load_dataset
 import cv2
 from sklearn.model_selection import train_test_split
-#import tensorflow_datasets as tfds
+import tensorflow_datasets as tfds
 
 class DatasetManager:
     def __init__(self):
         self.datasets = {
             Datasets.MNIST.value: self._load_mnist_data(),
             Datasets.FashionMNIST.value: self._load_fashion_data(),
-            #Datasets.KMNIST.value: self._load_kmnist_data(),
-            #Datasets.EMNIST.value: self._load_emnist_data(),
-            #Datasets.CIFAR10.value: self._load_cifar10_data(),
-            #Datasets.CIFAR100.value: self._load_cifar100_data(),
-            #Datasets.DeepWeeds.value: self._load_deepweeds_data(),
-            #Datasets.CitrusLeaves.value: self._load_citrus_leaves_data(),
-            #Datasets.SVHN.value: self._load_svhn_data(),
+            Datasets.KMNIST.value: self._load_kmnist_data(),
+            Datasets.EMNIST.value: self._load_emnist_data(),
+            Datasets.CIFAR10.value: self._load_cifar10_data(),
+            Datasets.CIFAR100.value: self._load_cifar100_data(),
+            Datasets.DeepWeeds.value: self._load_deepweeds_data(),
+            Datasets.FLOWERS.value: self._load_flowers_data(),
+            Datasets.SVHN.value: self._load_svhn_data(),
         }
 
     @staticmethod
@@ -109,22 +109,50 @@ class DatasetManager:
         x = tf.image.resize(x, (64, 64)).numpy()
         x = x.astype("float32") / 255.0
         y = tf.keras.utils.to_categorical(y, 9)
-        x_train, x_temp, y_train, y_temp = train_test_split(x, y, test_size=0.2, stratify=y.argmax(axis=1))
-        x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_temp, y_temp, val_ratio=0.2)
+        x_train, x_temp, y_train, y_temp = model_selection.train_test_split(x, y, test_size=0.4, stratify=y.argmax(axis=1))
+        x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_temp, y_temp, val_ratio=0.5)
         return x_train, y_train, x_test, y_test, x_val, y_val
 
     @staticmethod
-    def _load_citrus_leaves_data():
-        ds = tfds.load("citrus_leaves", split="train", as_supervised=True)
-        ds_np = tfds.as_numpy(ds)
-        images, labels = zip(*list(ds_np))
-        x = np.array(images)
-        y = np.array(labels)
-        x = tf.image.resize(x, (64, 64)).numpy()
-        x = x.astype("float32") / 255.0
-        y = tf.keras.utils.to_categorical(y, 4)
-        x_train, x_temp, y_train, y_temp = train_test_split(x, y, test_size=0.2, stratify=y.argmax(axis=1))
-        x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_temp, y_temp, val_ratio=0.2)
+    def _load_flowers_data():
+        def preprocess(image, label):
+            image = tf.image.resize(image, (64, 64))
+            image = tf.cast(image, tf.float32) / 255.0
+            return image, label
+
+        ds = tfds.load(
+            "oxford_flowers102",
+            split="train+validation+test",
+            as_supervised=True,
+        ).map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+        images, labels = next(iter(tfds.as_numpy(ds.batch(8192))))
+        y_onehot = tf.keras.utils.to_categorical(labels, num_classes=102)
+        x_train, x_temp, y_train, y_temp = model_selection.train_test_split(images, y_onehot, test_size=0.40, stratify=labels)
+        x_test, y_test, x_val, y_val = DatasetManager._split_test_val(x_temp, y_temp, val_ratio=0.5)
+        def augment_single(image):
+            image = tf.image.random_flip_left_right(image)
+            image = tf.image.random_brightness(image, 0.2)
+            image = tf.image.random_contrast(image, 0.8, 1.2)
+            image = tf.image.resize_with_crop_or_pad(image, 72, 72)
+            image = tf.image.random_crop(image, size=[64, 64, 3])
+            mask_size = 16
+            h, w = 64, 64
+            y = tf.random.uniform([], 0, h - mask_size, dtype=tf.int32)
+            x = tf.random.uniform([], 0, w - mask_size, dtype=tf.int32)
+            mask = tf.ones([mask_size, mask_size, 3])
+            paddings = [[y, h - y - mask_size], [x, w - x - mask_size], [0, 0]]
+            mask = tf.pad(mask, paddings, constant_values=0)
+            image = image * (1 - mask)
+            return image
+
+        x_train_aug = tf.map_fn(
+            augment_single,
+            tf.convert_to_tensor(x_train),
+            fn_output_signature=tf.float32,
+        ).numpy()
+        y_train_aug = y_train.copy()
+        x_train = np.concatenate([x_train, x_train_aug], axis=0)
+        y_train = np.concatenate([y_train, y_train_aug], axis=0)
         return x_train, y_train, x_test, y_test, x_val, y_val
 
     @staticmethod

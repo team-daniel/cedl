@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=c-edl                        # Job name
 #SBATCH --partition=gpu                         # What partition the job should run on
-#SBATCH --time=0-4:00:00                        # Time limit (DD-HH:MM:SS)
+#SBATCH --time=0-6:00:00                        # Time limit (DD-HH:MM:SS)
 #SBATCH --nodes=1                               # Number of nodes
 #SBATCH --ntasks=1                              # Number of MPI tasks to request
-#SBATCH --cpus-per-task=32                      # Number of CPU cores per MPI task
-#SBATCH --mem=166G                              # Total memory to request
+#SBATCH --cpus-per-task=16                      # Number of CPU cores per MPI task
+#SBATCH --mem=100G                              # Total memory to request
 #SBATCH --account=cs-urarobo-2019               # Project account to use
 #SBATCH --gres=gpu:1                            # GPU request
 #SBATCH --mail-type=ALL                         # Mail events (NONE, BEGIN, END, FAIL, ALL)
