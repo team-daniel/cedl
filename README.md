@@ -1,6 +1,9 @@
-# C-EDL
+# Conflict-aware Evidential Deep Learning
 
-text here
+This repository contains the code to reproduce Conflict-aware Evidential Deep Learning (C-EDL) and more general code to recreate all the experiments found in our paper!
+
+## C-EDL
+
 
 ## Models
 
