@@ -6,6 +6,7 @@ import scipy
 from tqdm import tqdm
 import gc
 import sklearn
+import cv2
 
 class StandardModel:
     def __init__(self, x_train, y_train, learning_rate=0.01):
@@ -1452,74 +1453,67 @@ class ConflictingEvidentialMetaModel:
                                  callbacks=[fisher_callback, lr_scheduler])
         return history
 
-    def apply_random_transformation(self, inputs):
-        transformations = ['rotate', 'shift', 'add_noise']
-        transform = random.choice(transformations)
-        inputs_transformed = inputs
-
-        if transform == 'rotate':
-            angle = random.uniform(-15, 15)  # Generate random angle between -15° and +15°
-            inputs_transformed = scipy.ndimage.rotate(inputs, angle, reshape=False, mode='nearest')
-        elif transform == 'shift':
-            shift_val = random.randint(-2, 2)
-            inputs_transformed = np.roll(inputs, shift=shift_val, axis=0)
-        elif transform == 'add_noise':
-            noise = np.random.normal(0, 0.01, inputs.shape)
-            inputs_transformed = inputs + noise
-
-        inputs_transformed = np.clip(inputs_transformed, 0, 1)
-        return inputs_transformed
-
     def apply_metamorphic_transformations(self, inputs, num_transforms=5):
-        transformed_images = [np.array(inputs)]
+        inputs = np.asarray(inputs, dtype=np.float32)
+        transformed_images = [inputs]
+        batch_size = len(inputs)
         for _ in range(num_transforms - 1):
-            transformed_batch = np.array([self.apply_random_transformation(img) for img in inputs])
+            transforms = np.random.choice(['rotate', 'shift', 'add_noise'], size=batch_size)
+            transformed_batch = np.empty_like(inputs)
+            for i in range(batch_size):
+                img = inputs[i]
+                transform = transforms[i]
+                if transform == 'rotate':
+                    angle = np.random.uniform(-15, 15)
+                    h, w = img.shape[:2]
+                    M = cv2.getRotationMatrix2D((w // 2, h // 2), angle, 1.0)
+                    rotated = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+                    if rotated.ndim == 2 and img.ndim == 3:
+                        rotated = rotated[..., np.newaxis]
+                    transformed_img = rotated.astype(np.float32)
+                elif transform == 'shift':
+                    shift_val = np.random.randint(-2, 3)
+                    transformed_img = np.roll(img, shift=shift_val, axis=0)
+                elif transform == 'add_noise':
+                    transformed_img = (img + np.random.normal(0, 0.01, img.shape)).astype(np.float32)
+                transformed_batch[i] = np.clip(transformed_img, 0, 1)
             transformed_images.append(transformed_batch)
         return np.stack(transformed_images, axis=0)
 
     def calculate_kintra(self, evidence):
-        evidence = np.array(evidence)
-        n_classes, n_runs = evidence.shape
+        evidence = np.asarray(evidence)
         epsilon = 1e-8
-        intra_class_normalized_std = []
-        for i in range(n_classes):
-            class_evidence = evidence[i]
-            std_dev = np.std(class_evidence)
-            mean_evidence = np.mean(class_evidence)
-            normalized_std = std_dev / (mean_evidence + epsilon)
-            intra_class_normalized_std.append(normalized_std)
-        k_intra = np.mean(intra_class_normalized_std)
-        return k_intra
+        std_dev = np.std(evidence, axis=2)
+        mean_evidence = np.mean(evidence, axis=2)
+        normalized_std = std_dev / (mean_evidence + epsilon)
+        return np.mean(normalized_std, axis=1)
 
     def calculate_krun_inter(self, evidence, alpha):
-        evidence = np.array(evidence)
-        n_classes, n_runs = evidence.shape
-        krun_inter_values = []
-        for run in range(n_runs):
-            pairwise_conflicts = []
-            e_values = evidence[:, run]
-            for i in range(n_classes):
-                for j in range(i + 1, n_classes):
-                    min_e = min(e_values[i], e_values[j])
-                    max_e = max(e_values[i], e_values[j])
-                    if max_e == 0:
-                        continue
-                    term = (min_e / max_e) * (min_e / np.sum(e_values)) * 2
-                    pairwise_conflicts.append(term)
-            if pairwise_conflicts:
-                sum_power_means = sum([conflict ** 2 for conflict in pairwise_conflicts]) ** (1 / 2)
-                scaled_sum_power_means = 1 - np.exp(-alpha * sum_power_means)
-                krun_inter_values.append(scaled_sum_power_means)
-            else:
-                krun_inter_values.append(0)
-        return np.mean(krun_inter_values)
+        B, C, R = evidence.shape
+        i_idx, j_idx = np.triu_indices(C, k=1)
+        krun_inter_values = np.zeros(B)
+        for b in range(B):
+            e = evidence[b]
+            denom_sum = np.sum(e, axis=0)
+            ei = e[i_idx]
+            ej = e[j_idx]
+            min_e = np.minimum(ei, ej)
+            max_e = np.maximum(ei, ej)
+            valid = max_e > 0
+            min_e_valid = np.where(valid, min_e, 0)
+            max_e_valid = np.where(valid, max_e, 1)
+            denom_sum_safe = np.where(denom_sum == 0, 1, denom_sum)
+            conflict = (min_e_valid / max_e_valid) * (min_e_valid / denom_sum_safe) * 2
+            sum_squared = np.sum(conflict ** 2, axis=0)
+            mean_sum_power = np.sqrt(sum_squared)
+            krun_inter_values[b] = np.mean(1 - np.exp(-alpha * mean_sum_power))
+        return krun_inter_values
 
     def compute_K_total(self, K_inter, K_intra):
-        lambda_penalty = 0.5 # default is 0.5
+        lambda_penalty = 0.5
         penalty_grid = lambda_penalty * (K_inter - K_intra)**2
         K_total = K_inter + K_intra - K_inter * K_intra - penalty_grid
-        K_total = np.clip(K_total, 0, 1)
-        return K_total
+        return np.clip(K_total, 0, 1)
 
     def process_evidence(self, evidence, alpha):
         K_intra = self.calculate_kintra(evidence)
@@ -1527,23 +1521,19 @@ class ConflictingEvidentialMetaModel:
         K_total = self.compute_K_total(K_inter, K_intra)
         return K_total, K_inter, K_intra
 
-    def predict_with_metamorphic_transforms(self, inputs, num_transforms=5, delta=1.0, alpha=1.5): #default is 1.0, 1.5
+    def predict_with_metamorphic_transforms(self, inputs, num_transforms=5, delta=1.0, alpha=1.5):
         original_evidence = self.model.predict(inputs, verbose=0)
         transformed_inputs = self.apply_metamorphic_transformations(inputs, num_transforms)
         batch_size = inputs.shape[0]
-        flat_transformed_inputs = tf.reshape(transformed_inputs, [-1, *self.input_shape])
-        evidences = self.model.predict(flat_transformed_inputs, verbose=0)
+        flat_inputs = tf.reshape(transformed_inputs, [-1, *self.input_shape])
+        evidences = self.model.predict(flat_inputs, verbose=0)
         evidences = tf.reshape(evidences, [num_transforms, batch_size, self.num_classes])
-        evidences = tf.transpose(evidences, [1, 2, 0])
-
-        adjusted_evidence = []
-        for sample_evidences in evidences.numpy():
-            K_total, K_inter, K_intra = self.process_evidence(sample_evidences, alpha)
-            mean_evidence = np.mean(sample_evidences, axis=1)
-            scaling_factor = np.exp(-K_total * delta)
-            adjusted_ev = mean_evidence * scaling_factor
-            adjusted_evidence.append(adjusted_ev)
-        return original_evidence, np.array(adjusted_evidence)
+        evidences = tf.transpose(evidences, [1, 2, 0]).numpy()
+        mean_evidences = np.mean(evidences, axis=2)
+        K_total, K_inter, K_intra = self.process_evidence(evidences, alpha)
+        scaling_factors = np.exp(-K_total * delta)[:, np.newaxis]
+        adjusted_evidence = mean_evidences * scaling_factors
+        return original_evidence, adjusted_evidence
 
     def predict(self, inputs, num_transforms=5, verbose=0, for_threshold=False):
         original_evidence, averaged_evidence = self.predict_with_metamorphic_transforms(inputs, num_transforms)
@@ -1671,48 +1661,39 @@ class ConflictingEvidentialMcModel:
         return history
 
     def calculate_kintra(self, evidence):
-        evidence = np.array(evidence)
-        n_classes, n_runs = evidence.shape
+        evidence = np.asarray(evidence)
         epsilon = 1e-8
-        intra_class_normalized_std = []
-        for i in range(n_classes):
-            class_evidence = evidence[i]
-            std_dev = np.std(class_evidence)
-            mean_evidence = np.mean(class_evidence)
-            normalized_std = std_dev / (mean_evidence + epsilon)
-            intra_class_normalized_std.append(normalized_std)
-        k_intra = np.mean(intra_class_normalized_std)
-        return k_intra
+        std_dev = np.std(evidence, axis=2)
+        mean_evidence = np.mean(evidence, axis=2)
+        normalized_std = std_dev / (mean_evidence + epsilon)
+        return np.mean(normalized_std, axis=1)
 
     def calculate_krun_inter(self, evidence, alpha):
-        evidence = np.array(evidence)
-        n_classes, n_runs = evidence.shape
-        krun_inter_values = []
-        for run in range(n_runs):
-            pairwise_conflicts = []
-            e_values = evidence[:, run]
-            for i in range(n_classes):
-                for j in range(i + 1, n_classes):
-                    min_e = min(e_values[i], e_values[j])
-                    max_e = max(e_values[i], e_values[j])
-                    if max_e == 0:
-                        continue
-                    term = (min_e / max_e) * (min_e / np.sum(e_values)) * 2
-                    pairwise_conflicts.append(term)
-            if pairwise_conflicts:
-                sum_power_means = sum([conflict ** 2 for conflict in pairwise_conflicts]) ** (1 / 2)
-                scaled_sum_power_means = 1 - np.exp(-alpha * sum_power_means)
-                krun_inter_values.append(scaled_sum_power_means)
-            else:
-                krun_inter_values.append(0)
-        return np.mean(krun_inter_values)
+        B, C, R = evidence.shape
+        i_idx, j_idx = np.triu_indices(C, k=1)
+        krun_inter_values = np.zeros(B)
+        for b in range(B):
+            e = evidence[b]
+            denom_sum = np.sum(e, axis=0)
+            ei = e[i_idx]
+            ej = e[j_idx]
+            min_e = np.minimum(ei, ej)
+            max_e = np.maximum(ei, ej)
+            valid = max_e > 0
+            min_e_valid = np.where(valid, min_e, 0)
+            max_e_valid = np.where(valid, max_e, 1)
+            denom_sum_safe = np.where(denom_sum == 0, 1, denom_sum)
+            conflict = (min_e_valid / max_e_valid) * (min_e_valid / denom_sum_safe) * 2
+            sum_squared = np.sum(conflict ** 2, axis=0)
+            mean_sum_power = np.sqrt(sum_squared)
+            krun_inter_values[b] = np.mean(1 - np.exp(-alpha * mean_sum_power))
+        return krun_inter_values
 
     def compute_K_total(self, K_inter, K_intra):
-        lambda_penalty = 0.5 #default 0.5
+        lambda_penalty = 0.5
         penalty_grid = lambda_penalty * (K_inter - K_intra)**2
         K_total = K_inter + K_intra - K_inter * K_intra - penalty_grid
-        K_total = np.clip(K_total, 0, 1)
-        return K_total
+        return np.clip(K_total, 0, 1)
 
     def process_evidence(self, evidence, alpha):
         K_intra = self.calculate_kintra(evidence)
@@ -1720,23 +1701,23 @@ class ConflictingEvidentialMcModel:
         K_total = self.compute_K_total(K_inter, K_intra)
         return K_total, K_inter, K_intra
 
-    def predict_with_mc_dropout(self, inputs, num_passes=5, delta=1.0, alpha=1.5): #default 1.0, 1.5
+    def predict_with_mc_dropout(self, inputs, num_passes=5, delta=1.0, alpha=1.5):
         original_evidence = self.model.predict(inputs, verbose=0)
         batch_size = inputs.shape[0]
         mc_evidences = []
+
         for _ in range(num_passes):
             ev = self.model(inputs, training=True)
             mc_evidences.append(ev)
-        mc_evidences = tf.stack(mc_evidences, axis=0)
-        mc_evidences = tf.transpose(mc_evidences, [1, 2, 0])
-        adjusted_evidence = []
-        for sample_evidences in mc_evidences.numpy():
-            K_total, K_inter, K_intra = self.process_evidence(sample_evidences, alpha)
-            mean_evidence = np.mean(sample_evidences, axis=1)
-            scaling_factor = np.exp(-K_total * delta)
-            adjusted_ev = mean_evidence * scaling_factor
-            adjusted_evidence.append(adjusted_ev)
-        return original_evidence, np.array(adjusted_evidence)
+
+        mc_evidences = tf.stack(mc_evidences, axis=0)                      # (passes, batch, classes)
+        mc_evidences = tf.transpose(mc_evidences, [1, 2, 0]).numpy()       # (batch, classes, passes)
+
+        mean_evidences = np.mean(mc_evidences, axis=2)
+        K_total, K_inter, K_intra = self.process_evidence(mc_evidences, alpha)
+        scaling_factors = np.exp(-K_total * delta)[:, np.newaxis]
+        adjusted_evidence = mean_evidences * scaling_factors
+        return original_evidence, adjusted_evidence
 
     def predict(self, inputs, num_transforms=5, verbose=0, for_threshold=False):
         original_evidence, averaged_evidence = self.predict_with_mc_dropout(inputs, num_transforms)
