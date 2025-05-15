@@ -1,4 +1,4 @@
 jobscript.job
 src/Results/
-src/_pychache_/
+src/_pycache_/
 *.log
