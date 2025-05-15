@@ -1488,7 +1488,7 @@ class ConflictingEvidentialMetaModel:
         normalized_std = std_dev / (mean_evidence + epsilon)
         return np.mean(normalized_std, axis=1)
 
-    def calculate_krun_inter(self, evidence, alpha):
+    def calculate_krun_inter(self, evidence, beta):
         B, C, R = evidence.shape
         i_idx, j_idx = np.triu_indices(C, k=1)
         krun_inter_values = np.zeros(B)
@@ -1506,7 +1506,7 @@ class ConflictingEvidentialMetaModel:
             conflict = (min_e_valid / max_e_valid) * (min_e_valid / denom_sum_safe) * 2
             sum_squared = np.sum(conflict ** 2, axis=0)
             mean_sum_power = np.sqrt(sum_squared)
-            krun_inter_values[b] = np.mean(1 - np.exp(-alpha * mean_sum_power))
+            krun_inter_values[b] = np.mean(1 - np.exp(-beta * mean_sum_power))
         return krun_inter_values
 
     def compute_K_total(self, K_inter, K_intra):
@@ -1515,13 +1515,13 @@ class ConflictingEvidentialMetaModel:
         K_total = K_inter + K_intra - K_inter * K_intra - penalty_grid
         return np.clip(K_total, 0, 1)
 
-    def process_evidence(self, evidence, alpha):
+    def process_evidence(self, evidence, beta):
         K_intra = self.calculate_kintra(evidence)
-        K_inter = self.calculate_krun_inter(evidence, alpha)
+        K_inter = self.calculate_krun_inter(evidence, beta)
         K_total = self.compute_K_total(K_inter, K_intra)
         return K_total, K_inter, K_intra
 
-    def predict_with_metamorphic_transforms(self, inputs, num_transforms=5, delta=1.0, alpha=1.5):
+    def predict_with_metamorphic_transforms(self, inputs, num_transforms=5, delta=1.0, beta=1.5):
         original_evidence = self.model.predict(inputs, verbose=0)
         transformed_inputs = self.apply_metamorphic_transformations(inputs, num_transforms)
         batch_size = inputs.shape[0]
@@ -1530,7 +1530,7 @@ class ConflictingEvidentialMetaModel:
         evidences = tf.reshape(evidences, [num_transforms, batch_size, self.num_classes])
         evidences = tf.transpose(evidences, [1, 2, 0]).numpy()
         mean_evidences = np.mean(evidences, axis=2)
-        K_total, K_inter, K_intra = self.process_evidence(evidences, alpha)
+        K_total, K_inter, K_intra = self.process_evidence(evidences, beta)
         scaling_factors = np.exp(-K_total * delta)[:, np.newaxis]
         adjusted_evidence = mean_evidences * scaling_factors
         return original_evidence, adjusted_evidence
@@ -1668,7 +1668,7 @@ class ConflictingEvidentialMcModel:
         normalized_std = std_dev / (mean_evidence + epsilon)
         return np.mean(normalized_std, axis=1)
 
-    def calculate_krun_inter(self, evidence, alpha):
+    def calculate_krun_inter(self, evidence, beta):
         B, C, R = evidence.shape
         i_idx, j_idx = np.triu_indices(C, k=1)
         krun_inter_values = np.zeros(B)
@@ -1686,7 +1686,7 @@ class ConflictingEvidentialMcModel:
             conflict = (min_e_valid / max_e_valid) * (min_e_valid / denom_sum_safe) * 2
             sum_squared = np.sum(conflict ** 2, axis=0)
             mean_sum_power = np.sqrt(sum_squared)
-            krun_inter_values[b] = np.mean(1 - np.exp(-alpha * mean_sum_power))
+            krun_inter_values[b] = np.mean(1 - np.exp(-beta * mean_sum_power))
         return krun_inter_values
 
     def compute_K_total(self, K_inter, K_intra):
@@ -1695,26 +1695,23 @@ class ConflictingEvidentialMcModel:
         K_total = K_inter + K_intra - K_inter * K_intra - penalty_grid
         return np.clip(K_total, 0, 1)
 
-    def process_evidence(self, evidence, alpha):
+    def process_evidence(self, evidence, beta):
         K_intra = self.calculate_kintra(evidence)
-        K_inter = self.calculate_krun_inter(evidence, alpha)
+        K_inter = self.calculate_krun_inter(evidence, beta)
         K_total = self.compute_K_total(K_inter, K_intra)
         return K_total, K_inter, K_intra
 
-    def predict_with_mc_dropout(self, inputs, num_passes=5, delta=1.0, alpha=1.5):
+    def predict_with_mc_dropout(self, inputs, num_passes=5, delta=1.0, beta=1.5):
         original_evidence = self.model.predict(inputs, verbose=0)
         batch_size = inputs.shape[0]
         mc_evidences = []
-
         for _ in range(num_passes):
             ev = self.model(inputs, training=True)
             mc_evidences.append(ev)
-
-        mc_evidences = tf.stack(mc_evidences, axis=0)                      # (passes, batch, classes)
-        mc_evidences = tf.transpose(mc_evidences, [1, 2, 0]).numpy()       # (batch, classes, passes)
-
+        mc_evidences = tf.stack(mc_evidences, axis=0)                  
+        mc_evidences = tf.transpose(mc_evidences, [1, 2, 0]).numpy()    
         mean_evidences = np.mean(mc_evidences, axis=2)
-        K_total, K_inter, K_intra = self.process_evidence(mc_evidences, alpha)
+        K_total, K_inter, K_intra = self.process_evidence(mc_evidences, beta)
         scaling_factors = np.exp(-K_total * delta)[:, np.newaxis]
         adjusted_evidence = mean_evidences * scaling_factors
         return original_evidence, adjusted_evidence
