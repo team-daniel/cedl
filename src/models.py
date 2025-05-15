@@ -1472,7 +1472,7 @@ class ConflictingEvidentialMetaModel:
                         rotated = rotated[..., np.newaxis]
                     transformed_img = rotated.astype(np.float32)
                 elif transform == 'shift':
-                    shift_val = np.random.randint(-2, 3)
+                    shift_val = np.random.randint(-2, 2)
                     transformed_img = np.roll(img, shift=shift_val, axis=0)
                 elif transform == 'add_noise':
                     transformed_img = (img + np.random.normal(0, 0.01, img.shape)).astype(np.float32)
