@@ -1,3 +1,4 @@
 jobscript.job
 src/Results/
 src/_pychache_/
+*.log
