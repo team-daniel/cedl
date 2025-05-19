@@ -2,3 +2,6 @@ jobscript.job
 src/Results/
 src/_pycache_/
 *.log
+dist/
+build/
+*.egg-info/
