@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cedl"
+version = "0.0.1"
+authors = [
+  { name="Charmaine Barker", email="charmaine.barker@york.ac.uk" },
+  { name="Daniel Bethell", email="daniel.bethell@york.ac.uk" },
+  { name="Simos Gerasimou", email="simos.gerasimou@york.ac.uk" },
+]
+description = "Our Conflict-aware Evidential Deep Learning (C-EDL) method enhances robustness to OOD and adversarial inputs by combining evidence from metamorphic transformations and reducing evidence when conflicts arise, signalling higher uncertainty."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy==1.26.4",
+    "eagerpy==0.30.0",
+    "foolbox==3.3.4",
+    "matplotlib==3.10.1",
+    "tensorflow==2.15.0",
+    "scipy==1.15.2",
+    "tqdm==4.67.1",
+    "scikit-learn==1.6.1",
+    "opencv-python==4.11.0.86",
+    "tensorflow-datasets==4.9.8",
+    "datasets==3.1.0",
+    "bs4==0.0.2"
+]
+classifiers = [
+    "Uncertainty Quantification",
+    "Evidential Deep Learning",
+]
+license = { text = "MIT" }
+
+[tool.setuptools]
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://github.com/team-daniel/cedl"
+Issues = "https://github.com/team-daniel/cedl/issues"
