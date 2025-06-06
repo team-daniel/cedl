@@ -8,21 +8,17 @@ Our Conflict-aware Evidential Deep Learning (C-EDL) approach, whose high-level w
 ![C-EDL Approach Overview](images/method.png "C-EDL Approach Overview")
 
 ## Setup
-To use the code provided, you must install the following dependencies first:
+To use the code provided, you can install this repository as a Python package locally. This will install all required packages using the snippet below:
 
 ```python
-numpy==1.26.4
-eagerpy==0.30.0
-foolbox==3.3.4
-matplotlib==3.10.1
-tensorflow==2.15.0
-scipy==1.15.2
-tqdm==4.67.1
-scikit-learn==1.6.1
-opencv-python==4.11.0.86
-tensorflow-datasets==4.9.8
-datasets==3.1.0
-bs4==0.0.2
+pip install git+https://github.com/team-daniel/cedl.git
+```
+You can then import the classes you require:
+
+```python
+from cedl.models import ConflictingEvidentialMetaModel
+...
+from cedl.dataset import DatasetManager
 ```
 
 Then, to use C-EDL and the other comparative methods, you must edit the main Python file. See an example below!: 
