@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]   # add wheel for good measure
+requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -35,8 +35,10 @@ license = { text = "MIT" }
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["cedl"]
 license-files = ["LICENSE"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [project.urls]
 Homepage = "https://github.com/team-daniel/cedl"
