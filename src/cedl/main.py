@@ -1,7 +1,7 @@
-from dataset import DatasetManager
-from utils import Datasets, Thresholds, Attacks
-import models
-from evaluator import ClassificationEvaluator
+from .dataset import DatasetManager
+from .utils import Datasets, Thresholds, Attacks
+from . import models
+from .evaluator import ClassificationEvaluator
 
 import numpy as np
 import time

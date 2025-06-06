@@ -1,7 +1,7 @@
-from dataset import DatasetManager
-from utils import Datasets, Thresholds, Attacks
-import metrics
-import models
+from .dataset import DatasetManager
+from .utils import Datasets, Thresholds, Attacks
+from . import metrics
+from . import models
 
 import eagerpy as ep
 import foolbox

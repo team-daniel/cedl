@@ -1,4 +1,4 @@
-from utils import Thresholds
+from .utils import Thresholds
 
 import numpy as np
 import scipy

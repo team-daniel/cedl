@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from utils import Datasets
+from .utils import Datasets
 from datasets import load_dataset
 import cv2
 from sklearn.model_selection import train_test_split
