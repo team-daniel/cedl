@@ -1,6 +1,6 @@
 # Conflict-aware Evidential Deep Learning
 
-[![](https://img.shields.io/badge/ArXiv-b31b1b?style=for-the-badge&logo=arxiv&label=&labelColor=4b4b4b)](https://arxiv.org/abs/2506.05937) [![](https://img.shields.io/badge/ICLR%20%2726-8c1b13?style=for-the-badge&logo=openreview&logoColor=white&label=&labelColor=4b4b4b)](https://openreview.net/forum?id=27oJibuygA) [![](https://img.shields.io/badge/Blog_Post-1f3d18?style=for-the-badge&logo=readthedocs&logoColor=white&label=&labelColor=4b4b4b)](https://daniel-bethell.co.uk/posts/cedl/)
+[![](https://img.shields.io/badge/Google%20Scholar-4285F4?style=for-the-badge&logo=googlescholar&logoColor=white&label=&labelColor=4b4b4b)](https://scholar.google.com/citations?view_op=view_citation&hl=en&user=jajX5SoAAAAJ&citation_for_view=jajX5SoAAAAJ:Y0pCki6q_DkC) [![](https://img.shields.io/badge/ArXiv-b31b1b?style=for-the-badge&logo=arxiv&label=&labelColor=4b4b4b)](https://arxiv.org/abs/2506.05937) [![](https://img.shields.io/badge/ICLR%20%2726-8c1b13?style=for-the-badge&logo=openreview&logoColor=white&label=&labelColor=4b4b4b)](https://openreview.net/forum?id=27oJibuygA) [![](https://img.shields.io/badge/Blog_Post-1f3d18?style=for-the-badge&logo=readthedocs&logoColor=white&label=&labelColor=4b4b4b)](https://daniel-bethell.co.uk/posts/cedl/)
 
 This repository contains the code to reproduce Conflict-aware Evidential Deep Learning (C-EDL) and more general code to recreate all the experiments found in our paper!
 
